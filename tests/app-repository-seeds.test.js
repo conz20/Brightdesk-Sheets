@@ -81,6 +81,7 @@ test('product repository generation creates ten locked product folders with orig
       const lock = JSON.parse(fs.readFileSync(path.join(destination, 'package-lock.json'), 'utf8'));
       const readme = fs.readFileSync(path.join(destination, 'README.md'), 'utf8');
       const workflow = fs.readFileSync(path.join(destination, '.github', 'workflows', 'product-installers.yml'), 'utf8');
+      const productBuilderConfig = fs.readFileSync(path.join(destination, 'electron-builder.app.config.js'), 'utf8');
       const dependabot = fs.readFileSync(path.join(destination, '.github', 'dependabot.yml'), 'utf8');
       const metadata = fs.readFileSync(path.join(destination, 'REPOSITORY_INFO.md'), 'utf8');
 
@@ -94,6 +95,8 @@ test('product repository generation creates ten locked product folders with orig
       for (const platform of ['win', 'mac', 'linux']) {
         assert.ok(pkg.scripts['dist:product:' + platform].startsWith('npm run native:build && '));
       }
+      assert.ok(productBuilderConfig.includes("'native/brightdesk_engine.node'"));
+      assert.ok(productBuilderConfig.includes("asarUnpack: ['native/brightdesk_engine.node']"));
       assert.ok(fs.existsSync(path.join(destination, 'rust', 'Cargo.toml')));
       assert.ok(fs.existsSync(path.join(destination, 'rust-toolchain.toml')));
       assert.ok(fs.existsSync(path.join(destination, 'src', 'rust-engine-fallback.js')));
