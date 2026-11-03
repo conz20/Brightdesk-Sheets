@@ -891,7 +891,41 @@ $('lists-delete').addEventListener('click',deleteCurrentList);
 $('lists-column-type').addEventListener('change',()=>{$('lists-column-options-wrap').hidden=$('lists-column-type').value!=='choice';});
 $('export-button').addEventListener('click',exportCurrent);$('open-button').addEventListener('click',openFile);$('save-project').addEventListener('click',saveProject);
 $('updates-button').addEventListener('click',async()=>{const msg=$('update-message');msg.hidden=false;msg.textContent=t('common.updateChecking');try{const r=await window.brightdesk.checkForUpdates();if(!r?.ok)msg.textContent=r?.message||'Update checks are not configured yet.';}catch(e){msg.textContent=`Update check failed: ${e.message}`;}});
-window.brightdesk.onUpdateState?.(updateState=>{const msg=$('update-message');msg.hidden=false;msg.textContent=updateState.message;if(updateState.status==='available'){msg.textContent=updateState.message;}if(updateState.status==='downloaded'){const button=document.createElement('button');button.className='text-button';button.textContent=t('common.restartInstall');button.onclick=()=>window.brightdesk.installUpdate();msg.append(' ',button);}});
+window.brightdesk.onUpdateState?.(updateState => {
+  const msg = $('update-message');
+  if (!msg) return;
+  msg.hidden = false;
+  msg.textContent = updateState.message || 'Brightdesk update status changed.';
+
+  const addActionButton = (label, action, workingLabel) => {
+    const button = document.createElement('button');
+    button.className = 'text-button';
+    button.type = 'button';
+    button.textContent = label;
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      button.textContent = workingLabel;
+      try {
+        const result = await action();
+        if (result?.ok === false) throw new Error(result.message || 'The update action could not be completed.');
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = label;
+        const detail = document.createElement('span');
+        detail.textContent = error.message || 'The update action failed.';
+        msg.append(' ', detail);
+      }
+    });
+    msg.append(' ', button);
+  };
+
+  if (updateState.status === 'available') {
+    addActionButton('Download update', () => window.brightdesk.downloadUpdate(), 'Starting download…');
+  }
+  if (updateState.status === 'downloaded') {
+    addActionButton('Install update', () => window.brightdesk.installUpdate(), 'Installing…');
+  }
+});
 loadLocal();$('platform').textContent=`Brightdesk desktop · ${window.brightdesk.platform}`;
 (async()=>{
   try {
