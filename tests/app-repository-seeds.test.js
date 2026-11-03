@@ -70,7 +70,17 @@ test('generated customer copy uses approved product wording', () => {
 test('product repository generation creates ten locked product folders with original artwork and release checks', () => {
   const root = path.resolve(__dirname, '..');
   const output = fs.mkdtempSync(path.join(os.tmpdir(), 'brightdesk-product-repositories-'));
+  const nativeDir = path.join(root, 'native');
+  const rustTarget = path.join(root, 'rust', 'target');
+  const nativeDirExisted = fs.existsSync(nativeDir);
+  const rustTargetExisted = fs.existsSync(rustTarget);
+  const nativeMarker = path.join(nativeDir, 'brightdesk-seed-test-' + process.pid + '.node');
+  const targetMarker = path.join(rustTarget, 'brightdesk-seed-test-' + process.pid + '.tmp');
   try {
+    fs.mkdirSync(nativeDir, { recursive: true });
+    fs.mkdirSync(rustTarget, { recursive: true });
+    fs.writeFileSync(nativeMarker, 'generated native test artifact');
+    fs.writeFileSync(targetMarker, 'generated Rust build cache marker');
     const result = createProductRepositorySeeds({ rootDir: root, outputDir: output });
     assert.equal(result.repositories.length, 10);
     const bundleReadme = fs.readFileSync(path.join(output, 'README-START-HERE.md'), 'utf8');
@@ -84,6 +94,9 @@ test('product repository generation creates ten locked product folders with orig
       const productBuilderConfig = fs.readFileSync(path.join(destination, 'electron-builder.app.config.js'), 'utf8');
       const dependabot = fs.readFileSync(path.join(destination, '.github', 'dependabot.yml'), 'utf8');
       const metadata = fs.readFileSync(path.join(destination, 'REPOSITORY_INFO.md'), 'utf8');
+
+      assert.equal(fs.existsSync(path.join(destination, 'native', path.basename(nativeMarker))), false);
+      assert.equal(fs.existsSync(path.join(destination, 'rust', 'target')), false);
 
       assert.equal(pkg.name, product.packageName);
       assert.equal(pkg.brightdeskAppId, product.appId);
@@ -134,6 +147,10 @@ test('product repository generation creates ten locked product folders with orig
       assert.ok(fs.existsSync(path.join(destination, 'src', 'main.js')));
     }
   } finally {
+    fs.rmSync(nativeMarker, { force: true });
+    fs.rmSync(targetMarker, { force: true });
+    if (!nativeDirExisted) fs.rmSync(nativeDir, { recursive: true, force: true });
+    if (!rustTargetExisted) fs.rmSync(rustTarget, { recursive: true, force: true });
     fs.rmSync(output, { recursive: true, force: true });
   }
 });
