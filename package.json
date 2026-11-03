@@ -80,7 +80,11 @@
     "dist:product:mac": "node scripts/build-app.js sheets mac",
     "verify:product:mac": "node scripts/verify-standalone-apps.js mac release/apps sheets",
     "dist:product:linux": "node scripts/build-app.js sheets linux",
-    "verify:product:linux": "node scripts/verify-standalone-apps.js linux release/apps sheets"
+    "verify:product:linux": "node scripts/verify-standalone-apps.js linux release/apps sheets",
+    "rust:fmt": "cargo fmt --manifest-path rust/Cargo.toml --all -- --check",
+    "rust:test": "cargo test --manifest-path rust/Cargo.toml",
+    "rust:build": "cargo build --manifest-path rust/Cargo.toml --release",
+    "rust:check": "npm run rust:fmt && cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings && npm run rust:test && npm run rust:build"
   },
   "dependencies": {
     "docx": "9.15.1",
