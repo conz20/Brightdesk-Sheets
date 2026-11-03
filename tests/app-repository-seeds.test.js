@@ -51,11 +51,11 @@ test('generated customer copy uses approved product wording', () => {
     assert.match(workflow, /npm test/);
     assert.match(workflow, /npm run release:preflight/);
     assert.match(workflow, /npm audit --audit-level=high/);
-    assert.match(workflow, /dtolnay\\/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8/);
-    assert.match(workflow, /toolchain: 1\\.99\\.1/);
-    assert.match(workflow, /cargo fmt --manifest-path rust\\/Cargo\\.toml --all -- --check/);
-    assert.match(workflow, /cargo clippy --manifest-path rust\\/Cargo\\.toml --workspace --all-targets -- -D warnings/);
-    assert.match(workflow, /cargo test --manifest-path rust\\/Cargo\\.toml --workspace/);
+    assert.ok(workflow.includes('dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'));
+    assert.ok(workflow.includes('toolchain: 1.99.1'));
+    assert.ok(workflow.includes('cargo fmt --manifest-path rust/Cargo.toml --all -- --check'));
+    assert.ok(workflow.includes('cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings'));
+    assert.ok(workflow.includes('cargo test --manifest-path rust/Cargo.toml --workspace'));
     assert.match(workflow, /npm run native:build/);
     assert.match(workflow, /BRIGHTDESK_REQUIRE_NATIVE_ENGINE: "1"/);
   }
