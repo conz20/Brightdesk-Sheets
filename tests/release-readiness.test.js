@@ -88,3 +88,10 @@ test('lockfile verifier rejects a missing or mismatched lockfile', () => {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('release script never publishes without the manual release workflow', () => {
+  const manifest = require('../package.json');
+  assert.equal(manifest.scripts.release, 'npm run verify:licenses && electron-builder --publish never');
+  assert.match(manifest.scripts.release, /--publish never$/);
+  assert.doesNotMatch(manifest.scripts.release, /--publish always/);
+});
