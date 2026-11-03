@@ -51,6 +51,13 @@ test('generated customer copy uses approved product wording', () => {
     assert.match(workflow, /npm test/);
     assert.match(workflow, /npm run release:preflight/);
     assert.match(workflow, /npm audit --audit-level=high/);
+    assert.match(workflow, /dtolnay\\/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8/);
+    assert.match(workflow, /toolchain: 1\\.99\\.1/);
+    assert.match(workflow, /cargo fmt --manifest-path rust\\/Cargo\\.toml --all -- --check/);
+    assert.match(workflow, /cargo clippy --manifest-path rust\\/Cargo\\.toml --workspace --all-targets -- -D warnings/);
+    assert.match(workflow, /cargo test --manifest-path rust\\/Cargo\\.toml --workspace/);
+    assert.match(workflow, /npm run native:build/);
+    assert.match(workflow, /BRIGHTDESK_REQUIRE_NATIVE_ENGINE: "1"/);
   }
 });
 
@@ -76,6 +83,14 @@ test('product repository generation creates ten locked product folders with orig
       assert.equal(pkg.build.appId, 'org.brightdesk.' + product.appId);
       assert.equal(pkg.build.productName, product.name);
       assert.match(pkg.scripts.test, /node --test/);
+      assert.ok(pkg.scripts.test.includes('tests/rust-engine.test.mjs'));
+      assert.ok(pkg.scripts.test.includes('tests/embedding-bridge.test.js'));
+      for (const platform of ['win', 'mac', 'linux']) {
+        assert.ok(pkg.scripts['dist:product:' + platform].startsWith('npm run native:build && '));
+      }
+      assert.ok(fs.existsSync(path.join(destination, 'rust', 'Cargo.toml')));
+      assert.ok(fs.existsSync(path.join(destination, 'rust-toolchain.toml')));
+      assert.ok(fs.existsSync(path.join(destination, 'src', 'rust-engine-fallback.js')));
       for (const file of [
         'tests/app-repository-seeds.test.js',
         'tests/integrated-app-shell.test.js',
