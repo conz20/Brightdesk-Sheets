@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
-/// Stable identity used by future Brightdesk Rust-to-host adapters.
+// Stable identity used by future Brightdesk Rust-to-host adapters.
 pub const ENGINE_NAME: &str = "Brightdesk Rust Core";
-/// Increment this only when the host-facing contract changes incompatibly.
+// Increment this only when the host-facing contract changes incompatibly.
 pub const ENGINE_PROTOCOL_VERSION: u16 = 1;
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -15,7 +15,11 @@ pub struct EngineInfo {
 
 #[must_use]
 pub const fn engine_info() -> EngineInfo {
-    EngineInfo { name: ENGINE_NAME, version: ENGINE_VERSION, protocol_version: ENGINE_PROTOCOL_VERSION }
+    EngineInfo {
+        name: ENGINE_NAME,
+        version: ENGINE_VERSION,
+        protocol_version: ENGINE_PROTOCOL_VERSION,
+    }
 }
 
 #[must_use]
