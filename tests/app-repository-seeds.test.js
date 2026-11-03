@@ -63,7 +63,7 @@ test('generated customer copy uses approved product wording', () => {
     assert.ok(workflow.includes('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'));
     assert.ok(workflow.includes('actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'));
     assert.ok(workflow.includes('softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65'));
-    assert.doesNotMatch(workflow, /uses: [^\\n]+@v[0-9]+/);
+    assert.equal(workflow.includes('@v'), false);
   }
 });
 
