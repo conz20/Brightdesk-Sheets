@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import test from "node:test";import assert from "node:assert/strict";import{engineInfo,normalizeEmbedding,cosineSimilarity,rankEmbeddings,chunkSource,analyzeSource}from"../scripts/rust-engine.mjs";
 test("loads the native engine or a compatible JavaScript fallback", () => {
   const info = engineInfo();
@@ -49,4 +50,14 @@ test("JavaScript fallback rejects unsafe vector and chunk inputs", () => {
   assert.throws(() => fallback.normalizeEmbedding([Number.NaN]), /finite/i);
   assert.throws(() => fallback.cosineSimilarity([1], [1, 2]), /matching dimensions/i);
   assert.throws(() => fallback.chunkSource("text", 64), /between 128 and 16000/i);
+});
+
+
+const productBuilderConfig = readFileSync(
+  new URL("../electron-builder.app.config.js", import.meta.url),
+  "utf8"
+);
+test("desktop installer includes and unpacks the native Rust addon", () => {
+  assert.ok(productBuilderConfig.includes("'native/brightdesk_engine.node'"));
+  assert.ok(productBuilderConfig.includes("asarUnpack: ['native/brightdesk_engine.node']"));
 });
