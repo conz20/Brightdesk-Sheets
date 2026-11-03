@@ -59,7 +59,7 @@ test('generated customer copy uses approved product wording', () => {
     assert.match(workflow, /npm run native:build/);
     assert.match(workflow, /BRIGHTDESK_REQUIRE_NATIVE_ENGINE: "1"/);
     assert.ok(workflow.includes('actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683'));
-    assert.ok(workflow.includes('actions/setup-node@a26af69be951a213d495a4c3e4e4022e16d87065'));
+    assert.ok(workflow.includes('actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'));
     assert.ok(workflow.includes('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'));
     assert.ok(workflow.includes('actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'));
     assert.ok(workflow.includes('softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65'));
