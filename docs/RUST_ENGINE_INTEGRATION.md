@@ -1,7 +1,9 @@
-# Rust engine integration
+# Rust Node-API engine integration
 
-This standalone Brightdesk product vendors the Rust engine source and builds it locally, without requiring access to the private Brightdesk-AI repository. Rust provides bounded source chunking, lightweight source analysis and deterministic lexical feature vectors through a JSON Lines process interface. The Node.js application remains the orchestration layer; the bridge includes a timeout and a clear missing-binary error so JavaScript fallback behavior can remain available.
+This standalone product builds a shared Rust engine as a Node-API 8 native library, loaded directly by Electron's main process. Rust handles bounded source processing, embedding normalization, cosine similarity, and deterministic vector ranking. JavaScript retains application orchestration and provider selection.
 
-Run `npm run rust:check` for formatting, Clippy, Rust tests and a release build. CI targets Linux, Windows and macOS. No compiled binary is committed.
+An explicitly configured embedding provider can supply vectors through the provider-neutral JavaScript adapter. Rust normalizes and ranks those vectors; it does not generate semantic embeddings or call language models. No provider, credential, paid API, or remote source upload is enabled. Any remote provider requires separate approval for data handling, retention, and cost.
 
-The 384-dimensional vectors are lexical features, **not semantic embeddings**. No external model provider or remote embedding service is enabled. Future adapters must be opt-in and must not upload customer documents or private source without explicit approval. Brightdesk-AI remains private and is not included in customer installers.
+The generated `native/brightdesk_engine.node` is unpacked from ASAR and is not committed. The renderer never loads native code; the context-isolated preload exposes only a read-only capability query. Customer apps do not depend on Brightdesk-AI.
+
+Use `npm run native:build`, `npm run rust:fmt`, `npm run rust:test`, and `npm run rust:check`. CI targets Linux, Windows, and macOS. This integration is not release-verified until all platform jobs pass.
