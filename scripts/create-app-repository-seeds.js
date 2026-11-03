@@ -63,6 +63,8 @@ const PRODUCT_TEST_FILES = Object.freeze([
   'tests/planner-ui-integration.test.js',
   'tests/rea-bench.test.js',
   'tests/release-readiness.test.js',
+  'tests/rust-engine.test.mjs',
+  'tests/embedding-bridge.test.js',
   'tests/resource-protection.test.js',
   'tests/standalone-downloads.test.js',
   'tests/standalone-pages.test.js',
@@ -189,6 +191,12 @@ function repositoryReadme(product) {
     '    npm ci',
     '    npm start',
     '',
+    'The JavaScript fallback keeps the product usable when the native addon is not built. To use the Rust engine during development, run:',
+    '',
+    '    npm run native:build',
+    '',
+    'Installer builds compile the native addon before packaging.',
+    '',
     'To build an installer on its native operating system:',
     '',
     '    npm run dist:product:mac',
@@ -201,7 +209,9 @@ function repositoryReadme(product) {
     '- src/ — Brightdesk desktop renderer and product modules.',
     '- assets/brightdesk-product.svg — original product artwork.',
     '- scripts/ — build and release verification tools.',
-    '- tests/ — automated product and shared-engine tests.',
+    '- rust/ — shared Rust Node-API engine source and tests.',
+    '- native/ — generated Node-API addon output (not committed).',
+    '- tests/ — automated product, Rust-engine and embedding-bridge tests.
     '',
     '## Related project',
     '',
@@ -261,7 +271,18 @@ function productWorkflow(product) {
     '      - run: npm run lock:verify',
     '      - run: npm ci --no-audit --no-fund',
     '      - run: npm run verify:licenses',
-    '      - run: npm test',
+    '      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8',
+    '        with:',
+    '          toolchain: 1.99.1',
+    '          components: rustfmt, clippy',
+    '      - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check',
+    '      - run: cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings',
+    '      - run: cargo test --manifest-path rust/Cargo.toml --workspace',
+    '      - run: npm run native:build',
+    '      - name: Run product tests with the native Rust engine required',
+    '        env:',
+    '          BRIGHTDESK_REQUIRE_NATIVE_ENGINE: "1"',
+    '        run: npm test',
     '      - run: npm run release:preflight',
     '      - run: npm audit --audit-level=high',
     '',
@@ -286,6 +307,10 @@ function productWorkflow(product) {
     '        with:',
     '          node-version: 24.22.2',
     '          cache: npm',
+    '      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8',
+    '        with:',
+    '          toolchain: 1.99.1',
+    '          components: rustfmt, clippy',
     '      - run: npm ci --no-audit --no-fund',
     '      - run: npm run dist:product:' + matrixPlatform,
     '      - run: npm run verify:product:' + matrixPlatform,
@@ -343,9 +368,9 @@ function makePackage(product, target) {
   manifest.build.directories = { ...(manifest.build.directories || {}), output: 'release' };
   manifest.build.publish = [];
   manifest.scripts.test = 'node --test ' + PRODUCT_TEST_FILES.join(' ');
-  manifest.scripts['dist:product:win'] = `node scripts/build-app.js ${product.appId} win`;
-  manifest.scripts['dist:product:mac'] = `node scripts/build-app.js ${product.appId} mac`;
-  manifest.scripts['dist:product:linux'] = `node scripts/build-app.js ${product.appId} linux`;
+  manifest.scripts['dist:product:win'] = `npm run native:build && node scripts/build-app.js ${product.appId} win`;
+  manifest.scripts['dist:product:mac'] = `npm run native:build && node scripts/build-app.js ${product.appId} mac`;
+  manifest.scripts['dist:product:linux'] = `npm run native:build && node scripts/build-app.js ${product.appId} linux`;
   manifest.scripts['verify:product:win'] = `node scripts/verify-standalone-apps.js win release/apps ${product.appId}`;
   manifest.scripts['verify:product:mac'] = `node scripts/verify-standalone-apps.js mac release/apps ${product.appId}`;
   manifest.scripts['verify:product:linux'] = `node scripts/verify-standalone-apps.js linux release/apps ${product.appId}`;
