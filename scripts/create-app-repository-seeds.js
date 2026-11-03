@@ -345,7 +345,10 @@ function productWorkflow(product) {
 
 function shouldCopy(source, destination, outputDir) {
   const name = path.basename(source);
+  const parentName = path.basename(path.dirname(source));
   if (excludedDirectories.has(name) || name === '.DS_Store') return false;
+  if (parentName === 'rust' && name === 'target') return false;
+  if (parentName === 'native' && name.endsWith('.node')) return false;
   const resolvedOutput = path.resolve(outputDir);
   const resolvedSource = path.resolve(source);
   if (resolvedSource === resolvedOutput || resolvedSource.startsWith(resolvedOutput + path.sep)) return false;
