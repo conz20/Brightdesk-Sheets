@@ -1,15 +1,217 @@
-use napi::{Error,Result};use napi_derive::napi;
-const MAX_SOURCE:usize=8*1024*1024;const MAX_DIMS:usize=16384;const MAX_CANDIDATES:usize=10000;const MAX_VALUES:usize=1000000;
-fn invalid(s:&str)->Error{Error::from_reason(s.to_owned())}
-fn norm(v:&[f64])->Result<f64>{if v.is_empty()||v.len()>MAX_DIMS{return Err(invalid("Embedding dimensions must be between 1 and 16384."));}if v.iter().any(|x|!x.is_finite()){return Err(invalid("Embedding values must be finite."));}let n=v.iter().map(|x|x*x).sum::<f64>().sqrt();if !n.is_finite()||n<=f64::EPSILON{return Err(invalid("Embedding vector must have non-zero magnitude."));}Ok(n)}
-#[napi(object)]pub struct EngineInfo{pub engine:String,pub version:String,pub node_api_version:u32,pub capabilities:Vec<String>}
-#[napi(object)]pub struct SourceStats{pub bytes:u32,pub lines:u32,pub token_count:u32}
-#[napi(object)]pub struct RankedEmbedding{pub index:u32,pub score:f64}
-#[napi(js_name="engineInfo")]pub fn engine_info()->EngineInfo{EngineInfo{engine:"Brightdesk Rust Native Engine".into(),version:env!("CARGO_PKG_VERSION").into(),node_api_version:8,capabilities:vec!["source-chunking".into(),"source-analysis".into(),"embedding-normalization".into(),"cosine-similarity".into(),"vector-ranking".into(),"provider-neutral".into()]}}
-#[napi(js_name="normalizeEmbedding")]pub fn normalize_embedding(v:Vec<f64>)->Result<Vec<f64>>{let n=norm(&v)?;Ok(v.into_iter().map(|x|x/n).collect())}
-fn cosine(a:&[f64],b:&[f64])->Result<f64>{let an=norm(a)?;let bn=norm(b)?;if a.len()!=b.len(){return Err(invalid("Embedding vectors must have matching dimensions."));}Ok((a.iter().zip(b).map(|(x,y)|x*y).sum::<f64>()/(an*bn)).clamp(-1.0,1.0))}
-#[napi(js_name="cosineSimilarity")]pub fn cosine_similarity(a:Vec<f64>,b:Vec<f64>)->Result<f64>{cosine(&a,&b)}
-#[napi(js_name="rankEmbeddings")]pub fn rank_embeddings(q:Vec<f64>,c:Vec<Vec<f64>>,limit:Option<u32>)->Result<Vec<RankedEmbedding>>{let _=norm(&q)?;if c.len()>MAX_CANDIDATES||c.iter().map(Vec::len).sum::<usize>()+q.len()>MAX_VALUES{return Err(invalid("Embedding ranking request exceeds configured limits."));}let mut r=Vec::with_capacity(c.len());for(i,v)in c.iter().enumerate(){r.push(RankedEmbedding{index:i as u32,score:cosine(&q,v)?});}r.sort_by(|a,b|b.score.total_cmp(&a.score).then_with(||a.index.cmp(&b.index)));r.truncate(limit.unwrap_or(r.len()as u32).min(r.len()as u32)as usize);Ok(r)}
-#[napi(js_name="chunkSource")]pub fn chunk_source(s:String,max_bytes:Option<u32>)->Result<Vec<String>>{if s.len()>MAX_SOURCE{return Err(invalid("Source text exceeds 8 MiB."));}let max=max_bytes.unwrap_or(2400)as usize;if !(128..=16000).contains(&max){return Err(invalid("Chunk size must be between 128 and 16000 bytes."));}let mut o=Vec::new();let mut start=0;while start<s.len(){let target=(start+max).min(s.len());let mut end=target;while end>start&&!s.is_char_boundary(end){end-=1;}if end<s.len(){if let Some(nl)=s[start..end].rfind('\n'){let p=start+nl+1;if p>start+max/2{end=p;}}}if end==start{end=s[start..].char_indices().nth(1).map(|(i,_)|start+i).unwrap_or(s.len());}o.push(s[start..end].to_owned());start=end;}Ok(o)}
-#[napi(js_name="analyzeSource")]pub fn analyze_source(s:String)->Result<SourceStats>{if s.len()>MAX_SOURCE{return Err(invalid("Source text exceeds 8 MiB."));}Ok(SourceStats{bytes:s.len()as u32,lines:s.lines().count()as u32,token_count:s.split_whitespace().count()as u32})}
-#[cfg(test)]mod tests{use super::*;#[test]fn vectors(){let v=normalize_embedding(vec![3.0,4.0]).unwrap();assert!((v[0]-0.6).abs()<1e-10);assert!(normalize_embedding(vec![0.0]).is_err());assert!(normalize_embedding(vec![f64::NAN]).is_err());}#[test]fn similarity_ranking(){assert_eq!(cosine_similarity(vec![1.0,0.0],vec![2.0,0.0]).unwrap(),1.0);let r=rank_embeddings(vec![1.0,0.0],vec![vec![0.0,1.0],vec![1.0,0.0],vec![2.0,0.0]],None).unwrap();assert_eq!(r.iter().map(|x|x.index).collect::<Vec<_>>(),vec![1,2,0]);}#[test]fn unicode_chunks(){let s="🦀".repeat(100);let c=chunk_source(s.clone(),Some(128)).unwrap();assert!(c.iter().all(|x|x.len()<=128));assert_eq!(c.concat(),s);}}
+use napi::{Error, Result};
+use napi_derive::napi;
+
+const MAX_SOURCE_BYTES: usize = 8 * 1024 * 1024;
+const MAX_EMBEDDING_DIMENSIONS: usize = 16_384;
+const MAX_VECTOR_CANDIDATES: usize = 10_000;
+const MAX_TOTAL_VECTOR_VALUES: usize = 1_000_000;
+
+fn invalid(message: &str) -> Error {
+    Error::from_reason(message.to_owned())
+}
+
+fn vector_norm(values: &[f64]) -> Result<f64> {
+    if values.is_empty() || values.len() > MAX_EMBEDDING_DIMENSIONS {
+        return Err(invalid("Embedding dimensions must be between 1 and 16384."));
+    }
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(invalid("Embedding values must all be finite numbers."));
+    }
+    let squared_norm = values.iter().map(|value| value * value).sum::<f64>();
+    let norm = squared_norm.sqrt();
+    if !norm.is_finite() || norm <= f64::EPSILON {
+        return Err(invalid("Embedding vector must have a finite, non-zero magnitude."));
+    }
+    Ok(norm)
+}
+
+#[napi(object)]
+pub struct EngineInfo {
+    pub engine: String,
+    pub version: String,
+    pub node_api_version: u32,
+    pub capabilities: Vec<String>,
+}
+
+#[napi(object)]
+pub struct SourceStats {
+    pub bytes: u32,
+    pub lines: u32,
+    pub token_count: u32,
+}
+
+#[napi(object)]
+pub struct RankedEmbedding {
+    pub index: u32,
+    pub score: f64,
+}
+
+#[napi(js_name = "engineInfo")]
+pub fn engine_info() -> EngineInfo {
+    EngineInfo {
+        engine: "Brightdesk Rust Native Engine".to_owned(),
+        version: env!("CARGO_PKG_VERSION").to_owned(),
+        node_api_version: 8,
+        capabilities: vec![
+            "source-chunking".to_owned(),
+            "source-analysis".to_owned(),
+            "embedding-normalization".to_owned(),
+            "cosine-similarity".to_owned(),
+            "vector-ranking".to_owned(),
+            "provider-neutral".to_owned(),
+        ],
+    }
+}
+
+#[napi(js_name = "normalizeEmbedding")]
+pub fn normalize_embedding(values: Vec<f64>) -> Result<Vec<f64>> {
+    let norm = vector_norm(&values)?;
+    Ok(values.into_iter().map(|value| value / norm).collect())
+}
+
+#[napi(js_name = "cosineSimilarity")]
+pub fn cosine_similarity(left: Vec<f64>, right: Vec<f64>) -> Result<f64> {
+    let left_norm = vector_norm(&left)?;
+    let right_norm = vector_norm(&right)?;
+    if left.len() != right.len() {
+        return Err(invalid("Embedding vectors must have matching dimensions."));
+    }
+    let dot = left.iter().zip(right.iter()).map(|(a, b)| a * b).sum::<f64>();
+    Ok((dot / (left_norm * right_norm)).clamp(-1.0, 1.0))
+}
+
+#[napi(js_name = "rankEmbeddings")]
+pub fn rank_embeddings(
+    query: Vec<f64>,
+    candidates: Vec<Vec<f64>>,
+    limit: Option<u32>,
+) -> Result<Vec<RankedEmbedding>> {
+    let _ = vector_norm(&query)?;
+    if candidates.len() > MAX_VECTOR_CANDIDATES {
+        return Err(invalid("Too many embedding candidates in one ranking request."));
+    }
+    let total_values = candidates.iter().map(Vec::len).sum::<usize>() + query.len();
+    if total_values > MAX_TOTAL_VECTOR_VALUES {
+        return Err(invalid("Embedding ranking request exceeds the vector-value limit."));
+    }
+    let mut ranked = Vec::with_capacity(candidates.len());
+    for (index, candidate) in candidates.iter().enumerate() {
+        let score = cosine_similarity(query.clone(), candidate.clone())?;
+        ranked.push(RankedEmbedding {
+            index: index as u32,
+            score,
+        });
+    }
+    ranked.sort_by(|left, right| {
+        right
+            .score
+            .total_cmp(&left.score)
+            .then_with(|| left.index.cmp(&right.index))
+    });
+    let take = limit.unwrap_or(ranked.len() as u32).min(ranked.len() as u32) as usize;
+    ranked.truncate(take);
+    Ok(ranked)
+}
+
+#[napi(js_name = "chunkSource")]
+pub fn chunk_source(source: String, max_bytes: Option<u32>) -> Result<Vec<String>> {
+    if source.len() > MAX_SOURCE_BYTES {
+        return Err(invalid("Source text exceeds the 8 MiB processing limit."));
+    }
+    let limit = max_bytes.unwrap_or(2400) as usize;
+    if !(128..=16_000).contains(&limit) {
+        return Err(invalid("Chunk size must be between 128 and 16000 bytes."));
+    }
+    let mut chunks = Vec::new();
+    let mut start = 0;
+    while start < source.len() {
+        let target = (start + limit).min(source.len());
+        let mut end = target;
+        while end > start && !source.is_char_boundary(end) {
+            end -= 1;
+        }
+        if end < source.len() {
+            if let Some(newline) = source[start..end].rfind('\n') {
+                let preferred = start + newline + 1;
+                if preferred > start + limit / 2 {
+                    end = preferred;
+                }
+            }
+        }
+        if end == start {
+            end = source[start..]
+                .char_indices()
+                .nth(1)
+                .map(|(offset, _)| start + offset)
+                .unwrap_or(source.len());
+        }
+        chunks.push(source[start..end].to_owned());
+        start = end;
+    }
+    Ok(chunks)
+}
+
+#[napi(js_name = "analyzeSource")]
+pub fn analyze_source(source: String) -> Result<SourceStats> {
+    if source.len() > MAX_SOURCE_BYTES {
+        return Err(invalid("Source text exceeds the 8 MiB processing limit."));
+    }
+    Ok(SourceStats {
+        bytes: source.len() as u32,
+        lines: source.lines().count() as u32,
+        token_count: source.split_whitespace().count() as u32,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalizes_vectors_without_changing_direction() {
+        let normalized = normalize_embedding(vec![3.0, 4.0]).unwrap();
+        assert!((normalized[0] - 0.6).abs() < 1e-10);
+        assert!((normalized[1] - 0.8).abs() < 1e-10);
+    }
+
+    #[test]
+    fn rejects_empty_zero_non_finite_and_oversized_vectors() {
+        assert!(normalize_embedding(vec![]).is_err());
+        assert!(normalize_embedding(vec![0.0, 0.0]).is_err());
+        assert!(normalize_embedding(vec![f64::NAN]).is_err());
+        assert!(normalize_embedding(vec![1.0; MAX_EMBEDDING_DIMENSIONS + 1]).is_err());
+    }
+
+    #[test]
+    fn computes_cosine_similarity() {
+        assert!((cosine_similarity(vec![1.0, 0.0], vec![2.0, 0.0]).unwrap() - 1.0).abs() < 1e-10);
+        assert!((cosine_similarity(vec![1.0, 0.0], vec![-1.0, 0.0]).unwrap() + 1.0).abs() < 1e-10);
+        assert!(cosine_similarity(vec![1.0], vec![1.0, 0.0]).is_err());
+    }
+
+    #[test]
+    fn ranking_is_descending_and_stable_for_ties() {
+        let ranked = rank_embeddings(
+            vec![1.0, 0.0],
+            vec![vec![0.0, 1.0], vec![1.0, 0.0], vec![2.0, 0.0]],
+            None,
+        ).unwrap();
+        assert_eq!(ranked.iter().map(|item| item.index).collect::<Vec<_>>(), vec![1, 2, 0]);
+    }
+
+    #[test]
+    fn chunks_preserve_unicode_and_respect_byte_limit() {
+        let source = "🦀".repeat(100);
+        let chunks = chunk_source(source.clone(), Some(128)).unwrap();
+        assert!(chunks.iter().all(|chunk| chunk.len() <= 128));
+        assert_eq!(chunks.concat(), source);
+    }
+
+    #[test]
+    fn source_analysis_reports_bounded_statistics() {
+        let stats = analyze_source("one two\nthree".to_owned()).unwrap();
+        assert_eq!(stats.bytes, 13);
+        assert_eq!(stats.lines, 2);
+        assert_eq!(stats.token_count, 3);
+    }
+}
