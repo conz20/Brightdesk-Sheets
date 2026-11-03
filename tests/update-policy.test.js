@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { DEFAULT_UPDATE_SETTINGS, normalizeUpdateSettings, getUpdaterPreferences } = require('../src/update-policy');
 
 test('automatic checking stays enabled while downloads and installs need approval', () => {
@@ -24,4 +25,21 @@ test('electron updater always waits for explicit download and installation actio
 
 test('safe default settings are immutable', () => {
   assert.deepEqual(DEFAULT_UPDATE_SETTINGS, { autoCheck: true, autoDownload: false, autoInstall: false });
+});
+
+test('the Electron main process cannot enable background updates', () => {
+  const main = fs.readFileSync(require('node:path').join(__dirname, '../src/main.js'), 'utf8');
+  assert.match(main, /Object\\.assign\\(autoUpdater, getUpdaterPreferences\\(\\)\\)/);
+  assert.doesNotMatch(main, /autoUpdater\\.autoDownload\\s*=\\s*true/);
+  assert.doesNotMatch(main, /autoUpdater\\.autoInstallOnAppQuit\\s*=\\s*true/);
+});
+
+test('the app exposes separate customer actions to download and install an update', () => {
+  const path = require('node:path');
+  const uiPath = fs.existsSync(path.join(__dirname, '../src/update-settings.js'))
+    ? path.join(__dirname, '../src/update-settings.js')
+    : path.join(__dirname, '../src/app.js');
+  const ui = fs.readFileSync(uiPath, 'utf8');
+  assert.match(ui, /update-manual-download|Download update/);
+  assert.match(ui, /update-manual-install|Install update/);
 });
