@@ -29,9 +29,9 @@ test('safe default settings are immutable', () => {
 
 test('the Electron main process cannot enable background updates', () => {
   const main = fs.readFileSync(require('node:path').join(__dirname, '../src/main.js'), 'utf8');
-  assert.match(main, /Object\\.assign\\(autoUpdater, getUpdaterPreferences\\(\\)\\)/);
-  assert.doesNotMatch(main, /autoUpdater\\.autoDownload\\s*=\\s*true/);
-  assert.doesNotMatch(main, /autoUpdater\\.autoInstallOnAppQuit\\s*=\\s*true/);
+  assert.ok(main.includes('Object.assign(autoUpdater, getUpdaterPreferences())'));
+  assert.ok(!main.includes('autoUpdater.autoDownload = true'));
+  assert.ok(!main.includes('autoUpdater.autoInstallOnAppQuit = true'));
 });
 
 test('the app exposes separate customer actions to download and install an update', () => {
