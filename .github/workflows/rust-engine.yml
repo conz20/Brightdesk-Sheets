@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: "24.22.2"
       - run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy && rustup default 1.99.1
-      - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - run: npm run rust:fmt
       - run: cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings
       - run: cargo test --manifest-path rust/Cargo.toml --workspace
       - run: npm run native:build
