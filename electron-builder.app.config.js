@@ -40,7 +40,8 @@ module.exports = {
   productName: 'Brightdesk ' + appName,
   extraMetadata: { brightdeskAppId: appId, productName: 'Brightdesk ' + appName, desktopName: `org.brightdesk.${appId}.desktop` },
   asar: true,
-  files: ['src/**/*', 'package.json', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'TERMS_AND_CONDITIONS.txt'],
+  files: ['src/**/*', 'native/brightdesk_engine.node', 'package.json', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'TERMS_AND_CONDITIONS.txt'],
+  asarUnpack: ['native/brightdesk_engine.node'],
   directories: { output: path.join('release', 'apps', appId) },
   publish: [],
   win: {
