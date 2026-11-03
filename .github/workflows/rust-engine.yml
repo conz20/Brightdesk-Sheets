@@ -31,4 +31,7 @@ jobs:
       - run: cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings
       - run: cargo test --manifest-path rust/Cargo.toml --workspace
       - run: npm run native:build
-      - run: node --test tests/rust-engine.test.mjs tests/embedding-bridge.test.js
+      - name: Test the native Node-API module and provider bridge
+        env:
+          BRIGHTDESK_REQUIRE_NATIVE_ENGINE: "1"
+        run: node --test tests/rust-engine.test.mjs tests/embedding-bridge.test.js
