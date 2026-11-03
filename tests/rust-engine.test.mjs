@@ -1,5 +1,14 @@
 import test from "node:test";import assert from "node:assert/strict";import{engineInfo,normalizeEmbedding,cosineSimilarity,rankEmbeddings,chunkSource,analyzeSource}from"../scripts/rust-engine.mjs";
-test("Node-API engine reports capabilities",()=>{const i=engineInfo();assert.equal(i.engine,"Brightdesk Rust Native Engine");assert.equal(i.nodeApiVersion,8);assert.ok(i.capabilities.includes("vector-ranking"));});
+test("loads the native engine or a compatible JavaScript fallback", () => {
+  const info = engineInfo();
+  assert.ok(info.native === true || info.fallback === true);
+  assert.equal(typeof info.engine, "string");
+  if (process.env.BRIGHTDESK_REQUIRE_NATIVE_ENGINE === "1") {
+    assert.equal(info.native, true);
+    assert.equal(info.nodeApiVersion, 8);
+    assert.ok(info.capabilities.includes("vector-ranking"));
+  }
+});
 test("normalizes vectors and rejects invalid values",()=>{const v=normalizeEmbedding([3,4]);assert.ok(Math.abs(v[0]-0.6)<1e-10);assert.throws(()=>normalizeEmbedding([0,0]),/non-zero/i);});
 test("computes cosine similarity and stable ranking",()=>{assert.equal(cosineSimilarity([1,0],[2,0]),1);assert.deepEqual(rankEmbeddings([1,0],[[0,1],[1,0],[2,0]]).map(x=>x.index),[1,2,0]);});
 test("chunks Unicode and analyses source",()=>{const s="🦀".repeat(100),c=chunkSource(s,128);assert.ok(c.every(x=>Buffer.byteLength(x)<=128));assert.equal(c.join(""),s);assert.equal(analyzeSource("one two\nthree").tokenCount,3);});
@@ -13,7 +22,7 @@ test("JavaScript fallback matches the native engine's core contract", () => {
   assert.equal(info.engine, "Brightdesk JavaScript Fallback");
   assert.equal(info.native, false);
   assert.equal(info.nodeApiVersion, 0);
-  assert.deepEqual(fallback.analyzeSource("one two\\nthree"), {
+  assert.deepEqual(fallback.analyzeSource(["one two", "three"].join(String.fromCharCode(10))), {
     bytes: 13,
     lines: 2,
     tokenCount: 3
