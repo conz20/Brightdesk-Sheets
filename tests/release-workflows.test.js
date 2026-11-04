@@ -8,6 +8,10 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
+if (require('../package.json').name !== 'brightdesk-suite') {
+  test('integrated suite release workflow checks are excluded from standalone product repositories', { skip: 'Standalone apps use their own product installer workflow.' }, () => {});
+} else {
+
 test('Dependabot checks npm dependencies and GitHub Actions weekly', () => {
   const workflow = read('.github/dependabot.yml');
   assert.match(workflow, /package-ecosystem: npm/);
@@ -166,3 +170,4 @@ test('new automatic installer checks replace stale builds without cancelling man
   assert.match(workflow, /group: brightdesk-installer-build-\$\{\{ github\.ref \}\}-\$\{\{ github\.event_name \}\}/);
   assert.match(workflow, /cancel-in-progress: \$\{\{ github\.event_name != 'workflow_dispatch' \}\}/);
 });
+}
