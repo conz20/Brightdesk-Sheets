@@ -211,7 +211,7 @@ function repositoryReadme(product) {
     '- scripts/ — build and release verification tools.',
     '- rust/ — shared Rust Node-API engine source and tests.',
     '- native/ — generated Node-API addon output (not committed).',
-    '- tests/ — automated product, Rust-engine and embedding-bridge tests.
+    '- tests/ — automated product, Rust-engine and embedding-bridge tests.',
     '',
     '## Related project',
     '',
