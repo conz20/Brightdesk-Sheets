@@ -56,7 +56,8 @@ Use win on Windows or linux on Linux instead of mac.
 ## Project structure
 
 - src/ — Brightdesk desktop renderer and product modules.
-- assets/brightdesk-product.svg — original product artwork.
+- `assets/icons/sheets.svg` — original Brightdesk Sheets application icon.
+- `assets/previews/sheets-workspace.svg` — workspace concept preview.
 - scripts/ — build and release verification tools.
 - tests/ — automated product and shared-engine tests.
 
