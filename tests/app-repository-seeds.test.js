@@ -51,13 +51,36 @@ test('generated customer copy uses approved product wording', () => {
     assert.match(workflow, /npm test/);
     assert.match(workflow, /npm run release:preflight/);
     assert.match(workflow, /npm audit --audit-level=high/);
+    assert.ok(workflow.includes('dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'));
+    assert.ok(workflow.includes('toolchain: 1.99.1'));
+    assert.ok(workflow.includes('cargo fmt --manifest-path rust/Cargo.toml --all -- --check'));
+    assert.ok(workflow.includes('cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings'));
+    assert.ok(workflow.includes('cargo test --manifest-path rust/Cargo.toml --workspace'));
+    assert.match(workflow, /npm run native:build/);
+    assert.match(workflow, /BRIGHTDESK_REQUIRE_NATIVE_ENGINE: "1"/);
+    assert.ok(workflow.includes('actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683'));
+    assert.ok(workflow.includes('actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'));
+    assert.ok(workflow.includes('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'));
+    assert.ok(workflow.includes('actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'));
+    assert.ok(workflow.includes('softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65'));
+    assert.equal(workflow.includes('@v'), false);
   }
 });
 
 test('product repository generation creates ten locked product folders with original artwork and release checks', () => {
   const root = path.resolve(__dirname, '..');
   const output = fs.mkdtempSync(path.join(os.tmpdir(), 'brightdesk-product-repositories-'));
+  const nativeDir = path.join(root, 'native');
+  const rustTarget = path.join(root, 'rust', 'target');
+  const nativeDirExisted = fs.existsSync(nativeDir);
+  const rustTargetExisted = fs.existsSync(rustTarget);
+  const nativeMarker = path.join(nativeDir, 'brightdesk-seed-test-' + process.pid + '.node');
+  const targetMarker = path.join(rustTarget, 'brightdesk-seed-test-' + process.pid + '.tmp');
   try {
+    fs.mkdirSync(nativeDir, { recursive: true });
+    fs.mkdirSync(rustTarget, { recursive: true });
+    fs.writeFileSync(nativeMarker, 'generated native test artifact');
+    fs.writeFileSync(targetMarker, 'generated Rust build cache marker');
     const result = createProductRepositorySeeds({ rootDir: root, outputDir: output });
     assert.equal(result.repositories.length, 10);
     const bundleReadme = fs.readFileSync(path.join(output, 'README-START-HERE.md'), 'utf8');
@@ -68,14 +91,28 @@ test('product repository generation creates ten locked product folders with orig
       const lock = JSON.parse(fs.readFileSync(path.join(destination, 'package-lock.json'), 'utf8'));
       const readme = fs.readFileSync(path.join(destination, 'README.md'), 'utf8');
       const workflow = fs.readFileSync(path.join(destination, '.github', 'workflows', 'product-installers.yml'), 'utf8');
+      const productBuilderConfig = fs.readFileSync(path.join(destination, 'electron-builder.app.config.js'), 'utf8');
       const dependabot = fs.readFileSync(path.join(destination, '.github', 'dependabot.yml'), 'utf8');
       const metadata = fs.readFileSync(path.join(destination, 'REPOSITORY_INFO.md'), 'utf8');
+
+      assert.equal(fs.existsSync(path.join(destination, 'native', path.basename(nativeMarker))), false);
+      assert.equal(fs.existsSync(path.join(destination, 'rust', 'target')), false);
 
       assert.equal(pkg.name, product.packageName);
       assert.equal(pkg.brightdeskAppId, product.appId);
       assert.equal(pkg.build.appId, 'org.brightdesk.' + product.appId);
       assert.equal(pkg.build.productName, product.name);
       assert.match(pkg.scripts.test, /node --test/);
+      assert.ok(pkg.scripts.test.includes('tests/rust-engine.test.mjs'));
+      assert.ok(pkg.scripts.test.includes('tests/embedding-bridge.test.js'));
+      for (const platform of ['win', 'mac', 'linux']) {
+        assert.ok(pkg.scripts['dist:product:' + platform].startsWith('npm run native:build && '));
+      }
+      assert.ok(productBuilderConfig.includes("'native/brightdesk_engine.node'"));
+      assert.ok(productBuilderConfig.includes("asarUnpack: ['native/brightdesk_engine.node']"));
+      assert.ok(fs.existsSync(path.join(destination, 'rust', 'Cargo.toml')));
+      assert.ok(fs.existsSync(path.join(destination, 'rust-toolchain.toml')));
+      assert.ok(fs.existsSync(path.join(destination, 'src', 'rust-engine-fallback.js')));
       for (const file of [
         'tests/app-repository-seeds.test.js',
         'tests/integrated-app-shell.test.js',
@@ -110,6 +147,10 @@ test('product repository generation creates ten locked product folders with orig
       assert.ok(fs.existsSync(path.join(destination, 'src', 'main.js')));
     }
   } finally {
+    fs.rmSync(nativeMarker, { force: true });
+    fs.rmSync(targetMarker, { force: true });
+    if (!nativeDirExisted) fs.rmSync(nativeDir, { recursive: true, force: true });
+    if (!rustTargetExisted) fs.rmSync(rustTarget, { recursive: true, force: true });
     fs.rmSync(output, { recursive: true, force: true });
   }
 });

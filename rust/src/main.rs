@@ -1,0 +1,2 @@
+use std::io::{self,BufRead,Write};use brightdesk_engine::{handle,Request};
+fn main(){let stdin=io::stdin();let stdout=io::stdout();let mut out=stdout.lock();for line in stdin.lock().lines(){let r=match line{Ok(s)if s.trim().is_empty()=>continue,Ok(s)=>match serde_json::from_str::<Request>(&s){Ok(q)=>handle(q),Err(e)=>{eprintln!("Invalid request: {e}");continue;}},Err(e)=>{eprintln!("Input error: {e}");break;}};if serde_json::to_writer(&mut out,&r).is_err(){break;}if writeln!(out).is_err()||out.flush().is_err(){break;}}}
