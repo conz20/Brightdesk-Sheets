@@ -5,7 +5,9 @@
 
 <p align="center"><strong>Work with tables, calculations, formulas and data.</strong></p>
 
-<p align="center"><img src="assets/previews/sheets-workspace.svg" alt="Brightdesk Sheets workspace design preview" width="100%"></p>
+<p align="center"><a href="https://raw.githubusercontent.com/connormolloy12/Brightdesk-Sheets/main/assets/previews/sheets-workspace.svg"><img src="assets/previews/sheets-workspace.svg" alt="Brightdesk Sheets workspace design preview" width="100%"></a></p>
+
+<p align="center"><sub>Select the preview to open the full-size artwork.</sub></p>
 
 > **Visual example:** This is an original Brightdesk design preview showing the intended desktop workspace. It is an illustrative concept, not a screenshot of a completed release build.
 
