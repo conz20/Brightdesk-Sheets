@@ -116,3 +116,13 @@ button:disabled{opacity:.55;cursor:not-allowed}
 @media(max-width:1050px){.sidebar{width:216px}}
 @media(max-width:760px){.manager-grid{grid-template-columns:1fr}.app-preview{height:145px}.main{padding-top:15px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* Brightdesk Sheets visual refinement — product-specific accent, shared suite-quality layout. */
+:root{--bd-accent:#16845B;--bd-accent-strong:#0D6545;--bd-accent-soft:#E5F5ED;--bd-focus:rgba(22,132,91,.22)}
+.brand{align-items:center;gap:12px;padding-bottom:30px}.brand-mark-image{width:40px;height:40px;display:block;flex:0 0 40px;border-radius:12px;box-shadow:0 4px 12px rgba(21,35,61,.16)}
+.app-icon-image{width:34px;height:34px;display:block;object-fit:contain;flex:0 0 auto;border-radius:10px;filter:drop-shadow(0 2px 3px rgba(20,35,62,.15))}.nav .app-icon-image{width:36px;height:36px;border-radius:11px}.app-card-header .app-icon-image{width:50px;height:50px;border-radius:14px;filter:drop-shadow(0 4px 6px rgba(20,35,62,.16))}
+.nav{min-height:46px;border-radius:10px;gap:12px;transition:background .16s ease,color .16s ease,transform .16s ease}.nav:hover{transform:translateX(2px)}.nav.active{box-shadow:inset 3px 0 0 var(--bd-accent)}
+.main{max-width:1700px;padding:26px clamp(20px,3vw,48px) 22px}.topbar{padding-bottom:16px}.topbar h1{font-size:25px;letter-spacing:-.6px}.welcome{min-height:148px;padding:28px 34px;border-radius:16px}.welcome h2{font-size:27px;letter-spacing:-.7px}.workspace{border-radius:13px;box-shadow:0 10px 30px rgba(25,42,68,.075)}.document-bar{height:58px}.ribbon-tabs{min-height:44px}.toolbar{min-height:52px;gap:5px;padding:8px 15px}.tool{border-radius:7px;padding:8px 11px}.editor{padding:42px clamp(28px,7vw,112px);font-size:15px;line-height:1.82}.primary,.secondary{min-height:38px;border-radius:9px;padding:10px 16px;font-size:12px;font-weight:650;transition:transform .14s ease,box-shadow .14s ease,background .14s ease}.primary:hover,.secondary:hover{transform:translateY(-1px);box-shadow:0 4px 11px rgba(27,45,75,.10)}.primary:active,.secondary:active{transform:translateY(0)}
+.app-card{border-radius:13px;padding:17px 18px 15px}.app-preview{border-radius:10px}.manager-hero{border-radius:14px;padding:26px 28px}.todo-app,.lists-app,.forms-app,.planner-app,.database-app,.workspace-app{border-radius:14px;box-shadow:0 8px 24px rgba(26,44,73,.055)}
+:focus-visible{outline:2px solid var(--bd-accent)!important;outline-offset:3px}
+@media(max-width:760px){.main{padding:18px 12px}.brand-mark-image{width:34px;height:34px;flex-basis:34px}.nav .app-icon-image{width:30px;height:30px}}

@@ -5,19 +5,17 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light" />
-  <title>Brightdesk</title>
+  <title>Brightdesk Sheets</title>
+  <link rel="icon" type="image/svg+xml" href="assets/brand/brightdesk-mark.svg">
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="design-system.css" />
 </head>
 <body>
   <aside class="sidebar">
-    <div class="brand"><div class="brand-mark">B</div><div><b>brightdesk</b><small data-i18n="sidebar.workspace">YOUR WORKSPACE</small></div></div>
+    <div class="brand"><img class="brand-mark-image" src="assets/brand/brightdesk-mark.svg" alt="" aria-hidden="true"><div><b>brightdesk</b><small data-i18n="sidebar.workspace">YOUR WORKSPACE</small></div></div>
     <div class="section-label" data-i18n="sidebar.yourApps">YOUR PRODUCTS</div>
-    <button class="nav active" data-app="pages"><span class="app-icon pages">P</span><span><b>Brightdesk Pages</b><small data-i18n="sidebar.documents">Documents</small></span></button>
-    <button class="nav" data-app="sheets"><span class="app-icon sheets">S</span><span><b>Brightdesk Sheets</b><small data-i18n="sidebar.spreadsheets">Spreadsheets</small></span></button>
-    <button class="nav" data-app="slides"><span class="app-icon slides">D</span><span><b>Brightdesk Decks</b><small data-i18n="sidebar.presentations">Presentations</small></span></button>
-    <button class="nav" data-app="notes"><span class="app-icon notes">N</span><span><b>Brightdesk Notes</b><small data-i18n="sidebar.quickNotes">Quick notes</small></span></button>
-    <div id="dynamic-app-nav"></div>
+    <button class="nav active" data-app="sheets"><img class="app-icon-image" src="assets/icons/sheets.svg" alt="" aria-hidden="true"><span><b>Brightdesk Sheets</b><small>Spreadsheets and data</small></span></button>
+    <div id="dynamic-app-nav" hidden></div>
     <div class="sidebar-divider"></div>
     <button class="nav manager-nav" id="manage-apps"><span class="app-icon manager-icon">＋</span><span><b data-i18n="sidebar.getApps">Get products</b><small data-i18n="sidebar.installManage">Install and manage</small></span></button>
     <button class="nav manager-nav" id="manage-languages"><span class="app-icon manager-icon">文</span><span><b data-i18n="sidebar.languages">Languages</b><small data-i18n="sidebar.languagePacks">Install language packs</small></span></button>

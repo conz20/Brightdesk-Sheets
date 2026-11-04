@@ -1,12 +1,15 @@
 # Brightdesk Sheets
 
-![Brightdesk Sheets repository banner](assets/social-preview.svg)
+<p align="center"><img src="assets/brand/brightdesk-logo.svg" alt="Brightdesk Office Suite" width="420"></p>
+<p align="center"><img src="assets/icons/sheets.svg" alt="Brightdesk Sheets application icon" width="112" height="112"></p>
 
-![Brightdesk Sheets product artwork](assets/brightdesk-product.svg)
+<p align="center"><strong>Work with tables, calculations, formulas and data.</strong></p>
 
-Work with tables, calculations, formulas and data.
+<p align="center"><img src="assets/previews/sheets-workspace.svg" alt="Brightdesk Sheets workspace design preview" width="100%"></p>
 
-Brightdesk is an independent desktop product. This repository is the dedicated desktop version of **Brightdesk Sheets**. It uses the shared Brightdesk desktop engine and opens directly into this product, with product switching disabled.
+> **Visual example:** This is an original Brightdesk design preview showing the intended desktop workspace. It is an illustrative concept, not a screenshot of a completed release build.
+
+Brightdesk Sheets is a dedicated desktop application within the independent Brightdesk Office Suite. It uses the shared Brightdesk design language and opens directly into Sheets.
 
 ## What this product does
 
