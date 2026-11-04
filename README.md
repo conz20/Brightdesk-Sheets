@@ -65,3 +65,26 @@ Use win on Windows or linux on Linux instead of mac.
 ## Identity and licence
 
 Brightdesk is independent and is not affiliated with Microsoft. It uses original product names, code, interface design and artwork. See LICENSE, TERMS_AND_CONDITIONS.txt and THIRD_PARTY_NOTICES.md.
+
+## Professional workspace examples and acceptance
+
+Sheets must feel like a capable spreadsheet workspace. The primary example should show a useful, realistic table with readable column headers, varied values, a selected cell, a formula result and a clear relationship between the formula bar and the grid.
+
+### Example workflow
+
+1. Create a workbook for a simple monthly budget or inventory.
+2. Add meaningful column names and realistic sample rows.
+3. Enter a total or average formula and show the calculated result.
+4. Sort or filter the records and make the active selection obvious.
+5. Export a CSV and verify that text values are handled safely.
+
+The grid must remain the main focus. Use consistent row/column headers, restrained gridlines, clear selection and edit states, legible formula entry, and visible feedback for sorting, filtering and export. Do not use decorative charts or controls that are not connected to working data.
+
+Follow the shared [Brightdesk visual and interaction standard](https://github.com/connormolloy12/Brightdesk-suite/blob/main/docs/BRIGHTDESK_VISUAL_STANDARD.md). Keep the artwork original to Brightdesk.
+
+### Acceptance checks
+
+- Cell selection, editing, formula evaluation and sorting/filtering produce observable results.
+- Formula-like exported text is safely handled by the CSV export path.
+- Keyboard navigation and focus are clear across the grid and toolbar.
+- Screenshots use realistic data and identify concept artwork versus a verified running build.
