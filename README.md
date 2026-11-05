@@ -47,15 +47,18 @@ Installer builds are started manually. Publishing a GitHub Release is a separate
 
 Use Node.js **24.22.2**.
 
-    npm ci
-    npm start
+```sh
+npm ci
+npm start
+```
 
-To build an installer on its native operating system:
+Build and verify each installer on its matching native operating system:
 
-    npm run dist:product:mac
-    npm run verify:product:mac
-
-Use win on Windows or linux on Linux instead of mac.
+| Platform | Build command | Verification command |
+| --- | --- | --- |
+| Windows | `npm run dist:product:win` | `npm run verify:product:win` |
+| macOS | `npm run dist:product:mac` | `npm run verify:product:mac` |
+| Linux | `npm run dist:product:linux` | `npm run verify:product:linux` |
 
 ## Project structure
 
