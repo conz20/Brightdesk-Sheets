@@ -1,0 +1,1 @@
+fn main() {\n    napi_build::setup();\n}\n

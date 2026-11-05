@@ -1,0 +1,1 @@
+[toolchain]\nchannel="1.99.1"\ncomponents=["rustfmt","clippy"]\nprofile="minimal"\n
