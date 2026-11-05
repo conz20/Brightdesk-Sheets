@@ -25,6 +25,12 @@ This product follows the [Brightdesk visual and interaction standard](https://gi
 - Keep the current workbook data on the device as part of the Brightdesk project.
 
 **Known boundaries:** This is a basic spreadsheet foundation. Do not assume VBA/macros, pivot tables, advanced formula coverage, complex workbook features or exact Excel round-trip compatibility.
+
+## Rust Node-API engine
+
+The desktop main process can load Brightdesk's Node-API 8 Rust engine for bounded text chunking, source analysis, embedding normalization, cosine similarity and deterministic vector ranking. Renderer access is restricted to validated `window.brightdesk` methods through the context-isolated preload. Ordinary development uses a compatible JavaScript fallback when the native module is unavailable; installer builds compile the native module before packaging.
+
+The engine does not generate semantic embeddings, call language models or upload spreadsheet content. Online collaboration and remote model services are separate capabilities and are not enabled by this engine.
 ## Download
 
 The latest desktop installers are published from this repository’s verified release workflow when a release is approved.
