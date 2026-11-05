@@ -1,1 +1,9 @@
-[workspace]\nresolver="2"\nmembers=["crates/brightdesk-engine"]\n[workspace.package]\nversion="0.1.0"\nedition="2021"\nlicense="MIT"\nrust-version="1.88"\n
+[workspace]
+resolver = "2"
+members = ["crates/brightdesk-engine"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.88"

@@ -1,1 +1,3 @@
-/node_modules/\n/rust/target/\n/native/*.node\n
+/node_modules/
+/rust/target/
+/native/*.node
