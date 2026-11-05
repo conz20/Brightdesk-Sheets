@@ -72,3 +72,9 @@ Use win on Windows or linux on Linux instead of mac.
 ## Identity and licence
 
 Brightdesk is independent and is not affiliated with Microsoft. It uses original product names, code, interface design and artwork. See LICENSE, TERMS_AND_CONDITIONS.txt and THIRD_PARTY_NOTICES.md.
+
+## Rust engineering foundation
+
+This repository now has a reviewable Rust integration contract in [docs/RUST_INTEGRATION.md](docs/RUST_INTEGRATION.md). Rust is being introduced alongside the existing JavaScript/Electron architecture, not as a rewrite. The document defines the safe-core rules, workload benchmarking, JavaScript fallback, native bridge gates, Cargo checks and the adoption standard for future Brightdesk repositories.
+
+This documentation does **not** claim that Rust is already connected to the application, included in installers or producing a performance improvement. Existing product behaviour, Node.js 24.22.2, the customer version 0.1.0, and manual owner approval for releases remain unchanged.
