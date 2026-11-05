@@ -93,7 +93,7 @@ Brightdesk is independent and is not affiliated with Microsoft. It uses original
 
 Pull requests and pushes to `main` run the product validation job. Markdown-only changes are excluded from this test workflow because they do not change executable product code; the README freshness check remains responsible for documentation changes.
 
-A scheduled maintenance validation runs every **Monday** at 17 4 * * 1 UTC. The scheduled run performs the Ubuntu-based test, release-preflight and dependency-audit job only; it does not create desktop installers.
+A scheduled maintenance validation runs every **Monday at 04:17 UTC**. The scheduled run performs the Ubuntu-based test, release-preflight and dependency-audit job only; it does not create desktop installers.
 
 The Windows, macOS and Linux installer matrix remains available through a manual workflow dispatch with `build_installers: true`. Publishing remains a separate opt-in action with `publish_release: true`. This keeps routine checks lighter without removing any operating-system build target or reducing cross-platform release coverage.
 
