@@ -33,11 +33,34 @@ function walk(dir, base = dir, files = []) {
   }
   return files;
 }
-function readText(file) {
-  if (file.size > MAX_FILE_BYTES || !SOURCE_EXT.has(file.ext)) return null;
-  const b = fs.readFileSync(file.abs);
-  if (b.includes(0)) return null;
-  return b.toString('utf8');
+function inventoryFileEntries(files, readFile = fs.readFileSync) {
+  const entries = [];
+  const inventory = [];
+  const missingFiles = [];
+
+  for (const file of files) {
+    let buffer;
+    try {
+      buffer = readFile(file.abs);
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        missingFiles.push(file.path);
+        continue;
+      }
+      throw error;
+    }
+
+    const entry = { ...file, size: buffer.length, buffer };
+    entries.push(entry);
+    inventory.push({
+      path: file.path,
+      size: buffer.length,
+      sha256: sha256(buffer),
+      extension: file.ext || '(none)'
+    });
+  }
+
+  return { files: entries, inventory, missingFiles };
 }
 function parseCatalog(root) {
   const p = path.join(root, 'src', 'app-catalog.js');
@@ -53,11 +76,9 @@ function parseCatalog(root) {
 function inspect(target) {
   const root = path.resolve(target);
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) throw new Error(`Target must be an existing directory: ${root}`);
-  const files = walk(root);
-  const inventory = files.map(f => {
-    const b = fs.readFileSync(f.abs);
-    return { path: f.path, size: f.size, sha256: sha256(b), extension: f.ext || '(none)' };
-  });
+  const scanned = inventoryFileEntries(walk(root));
+  const files = scanned.files;
+  const inventory = scanned.inventory;
   const byExt = {};
   for (const f of files) byExt[f.ext || '(none)'] = (byExt[f.ext || '(none)'] || 0) + 1;
   const pkgPath = path.join(root, 'package.json');
@@ -65,6 +86,13 @@ function inspect(target) {
   if (fs.existsSync(pkgPath)) { try { pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')); } catch (e) { pkg = { parseError: e.message }; } }
   const catalog = parseCatalog(root);
   const findings = [];
+  if (scanned.missingFiles.length) {
+    findings.push({
+      severity: 'warning',
+      id: 'files-changed-during-inspection',
+      message: `${scanned.missingFiles.length} file(s) disappeared during inventory collection; re-run the inspection for a stable snapshot.`
+    });
+  }
   const scopePath = path.join(root, 'PRODUCT_SCOPE_LOCK.md');
   if (!fs.existsSync(scopePath)) findings.push({ severity: 'warning', id: 'scope-lock-missing', message: 'No PRODUCT_SCOPE_LOCK.md found.' });
   if (catalog.error) findings.push({ severity: 'error', id: 'catalog-unreadable', message: catalog.error });
@@ -75,8 +103,8 @@ function inspect(target) {
   for (const id of excluded) if (appIds.includes(id)) findings.push({ severity: 'error', id: `excluded-app-${id}`, message: `Excluded app '${id}' appears in executable catalogue.` });
   const textFindings = [];
   for (const f of files) {
-    const text = readText(f);
-    if (text === null) continue;
+    if (f.size > MAX_FILE_BYTES || !SOURCE_EXT.has(f.ext) || f.buffer.includes(0)) continue;
+    const text = f.buffer.toString('utf8');
     if (/\b(?:eval|new Function)\s*\(/.test(text)) textFindings.push({ severity: 'warning', id: 'dynamic-code-execution', file: f.path, message: 'Possible dynamic code execution pattern; review context.' });
     if (/nodeIntegration\s*:\s*true/.test(text)) textFindings.push({ severity: 'error', id: 'electron-node-integration-enabled', file: f.path, message: 'Electron nodeIntegration appears enabled.' });
     if (/contextIsolation\s*:\s*false/.test(text)) textFindings.push({ severity: 'error', id: 'electron-context-isolation-disabled', file: f.path, message: 'Electron contextIsolation appears disabled.' });
@@ -124,4 +152,4 @@ function main() {
 if (require.main === module) {
   try { main(); } catch (e) { console.error(`REA Bench error: ${e.message}`); process.exitCode = 1; }
 }
-module.exports = { inspect, markdown, sha256 };
+module.exports = { inspect, markdown, sha256, inventoryFileEntries };
