@@ -59,6 +59,10 @@ Pull requests and pushes run the product and shared-engine test suite, verify th
 
 Installer builds are started manually. Publishing a GitHub Release is a separate manual choice and is disabled by default.
 
+## Static source inspection
+
+Brightdesk includes the local Brightdesk REA Bench for source and package inventory. Run `node scripts/brightdesk-rea.js inspect` to create a static evidence report. It does not execute the product or certify runtime behaviour. If a temporary build or test file disappears during the scan, the inspector records a warning and reports the files it could read instead of failing or claiming a complete snapshot.
+
 ## Run from source
 
 Use Node.js **24.22.2**.
