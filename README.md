@@ -77,7 +77,7 @@ Use win on Windows or linux on Linux instead of mac.
 
 - src/ — Brightdesk desktop renderer and product modules.
 - `assets/icons/sheets.svg` — original Brightdesk Sheets application icon.
-- `assets/previews/sheets-workspace.svg` — workspace concept preview.
+- `assets/previews/sheets-workspace.svg` — workspace interface design.
 - scripts/ — build and release verification tools.
 - tests/ — automated product and shared-engine tests.
 
