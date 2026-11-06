@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { inspect, sha256, markdown } = require('../scripts/brightdesk-rea');
+const { inspect, sha256, markdown, inventoryFileEntries } = require('../scripts/brightdesk-rea');
 
 const root = path.join(__dirname, '..');
 
@@ -24,4 +24,27 @@ test('REA report clearly states static-only evidence boundaries', () => {
   const md = markdown(report);
   assert.match(md, /Static source inspection only/);
   assert.match(md, /No target execution/);
+});
+
+test('REA inventory skips files that disappear during a concurrent scan and reports them', () => {
+  const files = [
+    { path: 'src/stable.js', size: 6, ext: '.js', abs: '/virtual/src/stable.js' },
+    { path: 'native/brightdesk-seed-test-20302.node', size: 12, ext: '.node', abs: '/virtual/native/brightdesk-seed-test-20302.node' }
+  ];
+  const result = inventoryFileEntries(files, (absolutePath) => {
+    if (absolutePath.endsWith('/stable.js')) return Buffer.from('source', 'utf8');
+    const error = new Error('temporary native file disappeared');
+    error.code = 'ENOENT';
+    throw error;
+  });
+
+  assert.equal(result.inventory.length, 1);
+  assert.deepEqual(result.inventory[0], {
+    path: 'src/stable.js',
+    size: 6,
+    sha256: sha256(Buffer.from('source', 'utf8')),
+    extension: '.js'
+  });
+  assert.deepEqual(result.missingFiles, ['native/brightdesk-seed-test-20302.node']);
+  assert.equal(result.files[0].buffer.toString('utf8'), 'source');
 });
