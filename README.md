@@ -45,7 +45,7 @@ The complete ten-product desktop suite remains available from [Brightdesk-suite]
 
 ## Quality and security
 
-Pull requests and pushes run the product and shared-engine test suite, verify the dependency lock and third-party licences, check release preflight and block high-severity dependency vulnerabilities. The same checks repeat daily. Dependabot checks npm packages and GitHub Actions weekly.
+Pull requests and pushes run the product and shared-engine test suite, verify the dependency lock and third-party licences, check release preflight and block high-severity dependency vulnerabilities. The same checks repeat daily. Dependabot checks npm packages and GitHub Actions weekly. The default test command also includes the Windows NSIS uninstaller-extraction and final visual-branding regression checks. Network-backed dictionary integration remains opt-in.
 
 Installer builds are started manually. Publishing a GitHub Release is a separate manual choice and is disabled by default.
 
