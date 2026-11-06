@@ -14,8 +14,7 @@
 Brightdesk Sheets is a dedicated desktop application within the independent Brightdesk Office Suite. It uses the shared Brightdesk design language and opens directly into Sheets.
 
 ## Shared Brightdesk design standard
-
-This product follows the [Brightdesk visual and interaction standard](https://github.com/connormolloy12/Brightdesk-suite/blob/main/docs/BRIGHTDESK_VISUAL_STANDARD.md) for branding, icon usage, layout, responsive behaviour and accessibility.
+This product follows the local [approved design brief](docs/BRIGHTDESK_DESIGN.md) and the canonical [Brightdesk visual and interaction standard](https://github.com/connormolloy12/Brightdesk-suite/blob/main/docs/BRIGHTDESK_VISUAL_STANDARD.md). Its approved accent is `#27845C`; the shared shell, original SVG identity, accessibility rules and screenshot evidence requirements remain consistent across the suite.
 
 ## Cross-platform consistency
 
@@ -41,18 +40,19 @@ These are configured build targets, not confirmation that a package has passed i
 - Keep the current workbook data on the device as part of the Brightdesk project.
 
 **Known boundaries:** This is a basic spreadsheet foundation. Do not assume VBA/macros, pivot tables, advanced formula coverage, complex workbook features or exact Excel round-trip compatibility.
-## Download
+## Cross-platform desktop packages
 
-The latest desktop installers are published from this repository’s verified release workflow when a release is approved.
+The approved cross-platform target is one Brightdesk interface and product scope on Windows, macOS and Linux. Each product must retain its approved icon and accent across those systems. Only operating-system integrations such as window chrome, native dialogs, keyboard conventions, permissions and packaging may vary.
 
-| Platform | Installer |
+| Platform | Configured package target |
 | --- | --- |
-| Windows | Windows x64 installer (.exe) |
-| macOS | Universal installer (.dmg), package (.pkg) and archive (.zip) |
-| Linux | x64 AppImage and Debian package (.deb) |
+| Windows | x64 NSIS installer (.exe) |
+| macOS | Universal disk image (.dmg), package installer (.pkg) and archive (.zip) |
+| Linux | x64 AppImage (.AppImage) and Debian package (.deb) |
 
-The complete ten-product desktop suite remains available from [Brightdesk-suite](https://github.com/connormolloy12/Brightdesk-suite).
+These are configured build targets, not confirmation that installers are published or have passed native verification. Build and verify each package on its target operating system before describing it as available. Release checks must cover installation, first launch, upgrade, launch after upgrade and removal. Removing Brightdesk must not silently delete local project data.
 
+The customer-facing release version and release approval are managed centrally by Brightdesk Office Suite. Publishing remains a separate manual action.
 ## Quality and security
 
 Pull requests and pushes run the product and shared-engine test suite, verify the dependency lock and third-party licences, check release preflight and block high-severity dependency vulnerabilities. The same checks repeat daily. Dependabot checks npm packages and GitHub Actions weekly.
@@ -63,15 +63,18 @@ Installer builds are started manually. Publishing a GitHub Release is a separate
 
 Use Node.js **24.22.2**.
 
-    npm ci
-    npm start
+```sh
+npm ci
+npm start
+```
 
-To build an installer on its native operating system:
+Build and verify each installer on its matching native operating system:
 
-    npm run dist:product:mac
-    npm run verify:product:mac
-
-Use win on Windows or linux on Linux instead of mac.
+| Platform | Build command | Verification command |
+| --- | --- | --- |
+| Windows | `npm run dist:product:win` | `npm run verify:product:win` |
+| macOS | `npm run dist:product:mac` | `npm run verify:product:mac` |
+| Linux | `npm run dist:product:linux` | `npm run verify:product:linux` |
 
 ## Project structure
 
