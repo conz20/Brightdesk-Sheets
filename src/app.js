@@ -508,22 +508,7 @@ function renderAppManager() {
       const stateTag = document.createElement('span'); stateTag.className = isInstalled ? 'app-state installed' : 'app-state'; stateTag.textContent = isInstalled ? t('manager.inWorkspace') : t('manager.notInstalled');
       footer.append(stateTag);
     }
-    const downloadButton = document.createElement('button');
-    downloadButton.className = 'text-button small-action';
-    downloadButton.textContent = 'Download desktop version';
-    downloadButton.setAttribute('aria-label', `Download ${item.name} for desktop`);
-    downloadButton.title = 'Open the verified Brightdesk desktop installer for this operating system.';
-    downloadButton.addEventListener('click', async () => {
-      downloadButton.disabled = true;
-      try {
-        await window.brightdesk.downloadStandaloneApp(item.id);
-      } catch (error) {
-        alert(`Could not open the ${item.name} download: ${error.message}`);
-      } finally {
-        downloadButton.disabled = false;
-      }
-    });
-    footer.append(downloadButton);
+
     card.append(preview, header, description, footer); grid.append(card);
   });
 }
