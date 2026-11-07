@@ -9,7 +9,6 @@ contextBridge.exposeInMainWorld('brightdesk', {
   platform: process.platform,
   version: process.env.npm_package_version || '0.1.0',
   getVersion: () => ipcRenderer.invoke('app:version'),
-  downloadStandaloneApp: (appId) => ipcRenderer.invoke('downloads:standalone-app', appId),
   openFile: () => ipcRenderer.invoke('file:open'),
   exportFile: (payload) => ipcRenderer.invoke('file:export', payload),
   saveProject: (project) => ipcRenderer.invoke('project:save', project),
