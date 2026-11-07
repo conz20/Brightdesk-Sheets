@@ -100,3 +100,7 @@ The Windows, macOS and Linux installer matrix remains available through a manual
 ## Documentation freshness
 
 The root README is maintained alongside the product, not as an end-of-project task. Every pull request that changes application code, tests, UI, design assets, screenshots, icons, configuration, dependencies, packaging, or build/release workflows must also update this README in the same pull request. Keep feature status, screenshots and visual references, application icons, setup/build instructions, platform compatibility, and repository links aligned with the latest verified implementation. Describe planned or untested functionality as planned, never as completed. The **README freshness** GitHub Actions check requires a root `README.md` update whenever a pull request or direct push to `main` changes a non-Markdown file; a passing check confirms inclusion, while reviewers remain responsible for checking factual accuracy and current visuals.
+
+## Test discovery
+
+The standard `npm test` command uses Node.js 24 automatic test discovery so newly added test files are included without maintaining a manual list. Suite-only contract checks remain explicitly skipped in individual product repositories. Network-backed dictionary integration checks remain opt-in with `BRIGHTDESK_LIVE_DICT_TESTS=1`.
