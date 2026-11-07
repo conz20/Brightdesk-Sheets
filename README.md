@@ -97,6 +97,10 @@ A scheduled maintenance validation runs every **Monday at 04:17 UTC**. The sched
 
 The Windows, macOS and Linux installer matrix remains available through a manual workflow dispatch with `build_installers: true`. Publishing remains a separate opt-in action with `publish_release: true`. This keeps routine checks lighter without removing any operating-system build target or reducing cross-platform release coverage.
 
+## Spreadsheet reference study
+
+The [GridCraft reference study and Brightdesk Sheets roadmap](docs/GRIDCRAFT_REFERENCE_AND_SHEETS_ROADMAP.md) records feature research, the current verified first-use scope, proposed priorities, acceptance evidence and licensing boundaries. It is a development roadmap, not a claim of GridCraft or Excel parity.
+
 ## Documentation freshness
 
 The root README is maintained alongside the product, not as an end-of-project task. Every pull request that changes application code, tests, UI, design assets, screenshots, icons, configuration, dependencies, packaging, or build/release workflows must also update this README in the same pull request. Keep feature status, screenshots and visual references, application icons, setup/build instructions, platform compatibility, and repository links aligned with the latest verified implementation. Describe planned or untested functionality as planned, never as completed. The **README freshness** GitHub Actions check requires a root `README.md` update whenever a pull request or direct push to `main` changes a non-Markdown file; a passing check confirms inclusion, while reviewers remain responsible for checking factual accuracy and current visuals.
