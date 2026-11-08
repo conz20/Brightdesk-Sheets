@@ -11,6 +11,10 @@ test('an individual product launch selects the focused product window', () => {
   assert.match(app, /Boolean\(launchAppId\)/);
   assert.match(app, /PRODUCT WORKSPACE/);
 });
+test('the product uses its original SVG icon in the product header', () => {
+  assert.ok(app.includes("icon.src = 'assets/icons/sheets.svg'"));
+  assert.match(app, /product-title-icon/);
+});
 test('the product window hides the Suite rail and keeps its own workspace', () => {
   assert.match(html, /href="product-window\.css"/);
   assert.match(css, /html\.is-product-window \.sidebar\s*\{display:none!important\}/);

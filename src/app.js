@@ -788,14 +788,14 @@ function render() {
   if (launchAppId) {
     const eyebrow = document.querySelector('.topbar .eyebrow');
     if (eyebrow) eyebrow.textContent = 'PRODUCT WORKSPACE';
-    const heading = $('app-title');
-    const sourceIcon = document.querySelector(`.sidebar .nav[data-app="${launchAppId}"] .app-icon-image`);
-    if (heading && sourceIcon && !heading.querySelector('.product-title-icon')) {
-      const icon = sourceIcon.cloneNode();
+    const title = $('app-title');
+    if (title && !title.querySelector('.product-title-icon')) {
+      const icon = document.createElement('img');
       icon.className = 'product-title-icon';
+      icon.src = 'assets/icons/sheets.svg';
       icon.alt = '';
       icon.setAttribute('aria-hidden', 'true');
-      heading.prepend(icon);
+      title.prepend(icon);
     }
   }
   $('top-actions').hidden = manager || languages;
