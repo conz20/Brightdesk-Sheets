@@ -117,6 +117,6 @@ The root README is maintained alongside the product, not as an end-of-project ta
 
 ## Individual product window
 
-When opened by itself, Brightdesk Sheets opens directly into its workbook workspace. The Suite's product-management sidebar and generic welcome banner are not shown. Product identity and file actions remain in the top bar; the workbook name, spreadsheet ribbon, formula controls and editable grid are arranged from top to bottom. The grid receives the available workspace width and scrolls within the work area.
+When opened by itself, Brightdesk Sheets opens directly into its workbook workspace. The Suite's generic product-management view and welcome banner are removed; its own left navigation remains available with optional compact icon-only mode and accessible labels. Product identity and file actions remain in the top bar; the workbook name, spreadsheet ribbon, formula controls and editable grid are arranged from top to bottom. The grid receives the available workspace width and scrolls within the work area.
 
 The interface preview is design artwork showing the intended workbook orientation; it is not a screenshot from a verified running build.
