@@ -165,5 +165,5 @@
 .sidebar.is-compact .app-icon-image, .sidebar.is-compact .manager-icon { width: 34px; height: 34px; flex: 0 0 34px; }
 .sidebar.is-compact .sidebar-toggle { top: 10px; right: calc(50% - 15px); }
 .sidebar .manager-icon { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-@media (max-width: 760px) { .sidebar-toggle { display: none; } }
+@media (max-width: 760px) { .sidebar, .sidebar.is-compact { width: 100%; min-width: 0; padding: 12px; } .sidebar-toggle { display: none; } }
 @media (prefers-reduced-motion: reduce) { .sidebar, .sidebar-toggle svg { transition: none !important; } }
