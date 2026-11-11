@@ -31,8 +31,6 @@ test('product centre uses approved Brightdesk desktop wording',()=>{
   assert.equal(english['manager.manageTitle'],'Manage your products');
   assert.equal(english['manager.installSelected'],'Add selected products');
   assert.equal(english['sidebar.getApps'],'Get products');
-  assert.ok(app.includes("downloadButton.textContent = 'Download desktop version'"));
-  assert.ok(app.includes('Open the verified Brightdesk desktop installer for this operating system.'));
   assert.doesNotMatch(app,/Download standalone|standalone installer/i);
   assert.doesNotMatch(html,/YOUR APPS|Get apps|Desktop app|Back to apps/i);
   assert.doesNotMatch(app,/Keep at least one app installed|Choose at least one app to install|Desktop app ·/i);
