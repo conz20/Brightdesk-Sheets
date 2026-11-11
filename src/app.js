@@ -932,6 +932,7 @@ function setSidebarState(state) {
   productSidebarToggle.title = label;
 }
 function syncSidebarDensity() {
+  if (!launchAppId) return;
   if (sidebarPreference) {
     setSidebarState(sidebarPreference);
   } else {
@@ -939,6 +940,7 @@ function syncSidebarDensity() {
   }
 }
 productSidebarToggle?.addEventListener('click', () => {
+  if (!launchAppId) return;
   sidebarPreference = productSidebar.classList.contains('is-compact') ? 'expanded' : 'compact';
   syncSidebarDensity();
 });
