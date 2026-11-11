@@ -22,9 +22,8 @@ This product follows the [Brightdesk visual and interaction standard](https://gi
 
 ## Product navigation
 
-The left navigation is 232 px wide when expanded. It can be collapsed to a slim 76 px icon rail and expanded again with the navigation control. In the compact state, the original SVG icons remain visible and each item keeps its full accessible name and tooltip. At 641–1007 px the rail starts compact to preserve workspace room; at 1008 px and above it starts expanded. It can be collapsed to a slim 76 px icon rail and expanded again with the navigation control. In the compact state, the original SVG icons remain visible and each item keeps its full accessible name and tooltip. At 641–1007 px the rail starts compact to preserve workspace room; at 1008 px and above it starts expanded. This is responsive navigation within a desktop window only. Brightdesk supports Windows, macOS and Linux desktop editions; it has no mobile application, mobile edition, mobile navigation mode or mobile installer. This control exists in individual product windows only. The Suite keeps its fixed 192 px labelled sidebar and has no expand/collapse option. This control exists in individual product windows only. The Suite keeps its fixed 192 px labelled sidebar and has no expand/collapse option.
+The left navigation is 232 px wide when expanded and collapses to a slim 76 px icon rail. The compact rail preserves each item's accessible name and tooltip. Individual product windows start compact at widths up to 1007 px and expanded at 1008 px and above. These are responsive desktop-window states, not a mobile edition or mobile build. Brightdesk supports desktop products for Windows, macOS and Linux only; no mobile application, mobile edition, mobile navigation mode or mobile installer is provided. Only individual product windows get collapsible navigation; the Suite keeps its fixed 192 px labelled sidebar.
 
-The interface preview above remains design artwork, not a captured product screenshot. A real screenshot will replace or supplement it only after the running desktop window has been launched and visually checked.
 
 ## Cross-platform consistency
 
