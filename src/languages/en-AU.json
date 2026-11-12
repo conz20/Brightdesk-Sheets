@@ -167,6 +167,8 @@
     "apps.lists": "Lists",
     "apps.planner": "Planner",
     "apps.todo": "To Do",
-    "apps.loop": "Workspace"
+    "apps.loop": "Workspace",
+    "top.print": "Print",
+    "top.printerSettings": "Printer settings"
   }
 }
