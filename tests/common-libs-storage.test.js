@@ -14,7 +14,7 @@ const loadStorage = () => require(helperPath);
 
 test('vendored JSON storage file matches the pinned Common-Libs Git blob', () => {
   const source = fs.readFileSync(helperPath);
-  const header = Buffer.from('blob ' + source.length + '\\0');
+  const header = Buffer.from('blob ' + source.length + '\0');
   const actual = createHash('sha1').update(Buffer.concat([header, source])).digest('hex');
   assert.equal(actual, expectedGitBlobSha);
 });
@@ -37,22 +37,22 @@ test('local renderer loads the vendored helper before app.js', () => {
   const appIndex = html.indexOf('<script src="app.js"></script>');
   assert.ok(vendorIndex >= 0, 'vendored helper script must be present');
   assert.ok(appIndex > vendorIndex, 'helper must load before app.js');
-  assert.doesNotMatch(vendorTag, /https?:\\/\\//, 'helper must be loaded locally');
+  assert.doesNotMatch(vendorTag, /https?:\/\//, 'helper must be loaded locally');
 });
 
 test('renderer uses the shared adapter without changing established storage keys', () => {
   const app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
-  assert.match(app, /commonJsonStorage\\.cloneJsonValue/);
-  assert.match(app, /commonJsonStorage\\.readJsonValue\\(localStorage,\\s*['"]brightdesk-docs-v3['"]/);
-  assert.match(app, /fallbackKeys:\\s*\\[['"]brightdesk-docs-v2['"]\\]/);
-  assert.match(app, /commonJsonStorage\\.writeJsonValue\\(localStorage,\\s*['"]brightdesk-docs-v3['"],\\s*state\\.docs\\)/);
-  assert.match(app, /commonJsonStorage\\.readJsonValue\\(localStorage,\\s*['"]brightdesk-app-setup-v1['"]/);
-  assert.match(app, /commonJsonStorage\\.writeJsonValue\\(localStorage,\\s*['"]brightdesk-app-setup-v1['"],/);
+  assert.match(app, /commonJsonStorage\.cloneJsonValue/);
+  assert.match(app, /commonJsonStorage\.readJsonValue\(localStorage,\s*['"]brightdesk-docs-v3['"]/);
+  assert.match(app, /fallbackKeys:\s*\[['"]brightdesk-docs-v2['"]\]/);
+  assert.match(app, /commonJsonStorage\.writeJsonValue\(localStorage,\s*['"]brightdesk-docs-v3['"],\s*state\.docs\)/);
+  assert.match(app, /commonJsonStorage\.readJsonValue\(localStorage,\s*['"]brightdesk-app-setup-v1['"]/);
+  assert.match(app, /commonJsonStorage\.writeJsonValue\(localStorage,\s*['"]brightdesk-app-setup-v1['"],/);
 });
 
 test('legacy documents remain readable and the current key receives the next save', () => {
   const api = loadStorage();
-  const values = new Map([['brightdesk-docs-v2', JSON.stringify({ slides: [{ title: 'Existing local work' }] })]]);
+  const values = new Map([['brightdesk-docs-v2', JSON.stringify({ sheets: { A1: 'Existing local work' } })]]);
   const storage = {
     getItem(key) { return values.has(key) ? values.get(key) : null; },
     setItem(key, value) { values.set(key, String(value)); }
@@ -61,7 +61,7 @@ test('legacy documents remain readable and the current key receives the next sav
     fallbackKeys: ['brightdesk-docs-v2'],
     fallbackValue: null
   });
-  assert.deepEqual(loaded, { slides: [{ title: 'Existing local work' }] });
+  assert.deepEqual(loaded, { sheets: { A1: 'Existing local work' } });
   assert.equal(values.has('brightdesk-docs-v2'), true);
   api.writeJsonValue(storage, 'brightdesk-docs-v3', loaded);
   assert.deepEqual(JSON.parse(values.get('brightdesk-docs-v3')), loaded);
