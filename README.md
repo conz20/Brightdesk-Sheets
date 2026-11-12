@@ -122,6 +122,12 @@ The root README is maintained alongside the product, not as an end-of-project ta
 
 Once installed, this product uses the internet only to check for, download and install official Brightdesk updates. The product does not provide separate in-product installer downloads, customer accounts, passwords, profiles, subscriptions, cloud storage or online services. Normal product work remains local and available offline. Initial installer distribution takes place outside the running product. Spelling checks run locally. Already-installed, integrity-verified dictionaries remain available offline. Entries that are not included in this build are catalogue information only and cannot be downloaded in-product. Future dictionary pack discovery, download and updates must use verified official Brightdesk resources; automatic hybrid fallback and the complete pack catalogue are still pending for this product.
 
+## Shared local JSON storage
+
+The renderer uses the Brightdesk Common-Libs JSON storage helper from a checked-in local copy at `src/vendor/brightdesk-common-libs/json-storage.js`. The helper is loaded before `app.js`, is included in the normal packaged source tree, and makes no network request. Its exact upstream commit and Git blob SHA are recorded in `src/vendor/brightdesk-common-libs/UPSTREAM.json`.
+
+The migration keeps the existing `brightdesk-docs-v3`, legacy `brightdesk-docs-v2` and `brightdesk-app-setup-v1` storage keys. Existing local data is not moved or deleted. The consumer contract tests verify the vendor pin, provenance, script order, compatibility with legacy documents and preservation of malformed stored data for recovery.
+
 ## Private CI runner
 
 Pull-request product tests and README checks run on Brightdesk's private macOS ARM64 runner. Routine pull-request verification does not use GitHub-hosted paid runners. Installer matrix builds and release publishing are separate manual workflow actions and are not run by pull-request checks.
