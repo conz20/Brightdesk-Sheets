@@ -75,7 +75,7 @@ Installer builds are started manually. Publishing a GitHub Release is a separate
 
 Use Node.js **24.22.2**.
 
-The desktop shell uses Electron **45.2.3**. Run `npm ci` to install the exact dependency versions recorded in the lockfile.
+The desktop shell uses Electron **45.2.1**. Run `npm ci` to install the exact dependency versions recorded in the lockfile.
 
     npm ci
     npm start
