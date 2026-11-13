@@ -137,4 +137,4 @@ Pull-request product tests and README checks run on Brightdesk's private macOS A
 
 ## Customer Help
 
-The desktop header includes a **Help** link. It opens the Brightdesk Sheets customer guide. Help opens in the customer's normal browser. The customer help website is not yet published, so this link is not ready for customer release. Brightdesk remains usable offline; no document or product data is sent when Help is opened.
+The left sidebar includes a discreet **Help** link near the bottom. It opens the Brightdesk Sheets customer guide. Help opens in the customer's normal browser. The customer help website is not yet published, so this link is not ready for customer release. Brightdesk remains usable offline; no document or product data is sent when Help is opened.
