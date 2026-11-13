@@ -133,3 +133,8 @@ The migration keeps the existing `brightdesk-docs-v3`, legacy `brightdesk-docs-v
 ## Private CI runner
 
 Pull-request product tests and README checks run on Brightdesk's private macOS ARM64 runner. Routine pull-request verification does not use GitHub-hosted paid runners. Installer matrix builds and release publishing are separate manual workflow actions and are not run by pull-request checks.
+
+
+## Customer Help
+
+The desktop header includes a **Help** link. It opens the Brightdesk Sheets customer guide. Help opens in the customer's normal browser. The customer help website is not yet published, so this link is not ready for customer release. Brightdesk remains usable offline; no document or product data is sent when Help is opened.
