@@ -122,7 +122,7 @@ The root README is maintained alongside the product, not as an end-of-project ta
 
 ## Customer network policy
 
-Once installed, this product uses the internet only to check for, download and install official Brightdesk updates. The product does not provide separate in-product installer downloads, customer accounts, passwords, profiles, subscriptions, cloud storage or online services. Normal product work remains local and available offline. Initial installer distribution takes place outside the running product. Spelling checks run locally. Already-installed, integrity-verified dictionaries remain available offline. Entries that are not included in this build are catalogue information only and cannot be downloaded in-product. Future dictionary pack discovery, download and updates must use verified official Brightdesk resources; automatic hybrid fallback and the complete pack catalogue are still pending for this product.
+Once installed, this product uses the internet for official Brightdesk updates. When a customer selects Help, it opens the official read-only Brightdesk Help website in the normal browser; no document or product data is sent, and the connection is not made until Help is selected. The product does not provide separate in-product installer downloads, customer accounts, passwords, profiles, subscriptions, cloud storage or online services. Normal product work remains local and available offline. Initial installer distribution takes place outside the running product. Spelling checks run locally. Already-installed, integrity-verified dictionaries remain available offline. Entries that are not included in this build are catalogue information only and cannot be downloaded in-product. Future dictionary pack discovery, download and updates must use verified official Brightdesk resources; automatic hybrid fallback and the complete pack catalogue are still pending for this product.
 
 ## Shared local JSON storage
 
@@ -133,3 +133,9 @@ The migration keeps the existing `brightdesk-docs-v3`, legacy `brightdesk-docs-v
 ## Private CI runner
 
 Pull-request product tests and README checks run on Brightdesk's private macOS ARM64 runner. Routine pull-request verification does not use GitHub-hosted paid runners. Installer matrix builds and release publishing are separate manual workflow actions and are not run by pull-request checks.
+
+
+## Customer Help
+
+The left sidebar includes a small, discreet **Help** link near the bottom. It opens the Brightdesk Sheets guide at the reserved address `https://help.brightdesk.com/products/sheets.html` in the customer's normal browser. The website is not live or verified yet, so this draft must not be released until the production address and all customer pages have been verified. The Wiki is updated independently: approved guide changes appear the next time a customer opens Help and do not require a Brightdesk installer update. Opening Help sends no document or product data.
+
