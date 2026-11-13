@@ -117,7 +117,7 @@ The [GridCraft reference study and Brightdesk Sheets roadmap](docs/GRIDCRAFT_REF
 
 ## Test discovery
 
-`npm test` uses Node.js 24 automatic test discovery so newly added regression files are included without maintaining a manual list. Suite-only catalogue and integrated release-contract tests carry explicit skip annotations in standalone products; they are not silently omitted. The dictionary service regression also verifies that an unbundled catalogue entry cannot trigger a network request.
+`npm test` uses Node.js 24 automatic test discovery so newly added regression files are included without maintaining a manual list. The dictionary-service regression also verifies that an unbundled catalogue entry cannot trigger a network request. On the private macOS runner, the suite-only catalogue and integrated release-workflow checks are marked not applicable to standalone products, and Linux-installer tests are marked not applicable to a macOS host; those platform-specific installer checks still require a Linux-host run.
 
 ## Documentation freshness
 
