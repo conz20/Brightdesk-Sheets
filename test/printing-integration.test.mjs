@@ -14,14 +14,14 @@ test("Printing snapshot is the dependency-free approved upstream version",()=>{
 test("the Sheets workspace contains shared Print actions",()=>{
  const html=read("src/index.html"),app=read("src/app.js"),main=read("src/main.js"),preload=read("src/preload.js");
  assert.match(html,/id="print-button"/);assert.match(html,/id="printer-settings-button"/);
- assert.match(app,/window\.brightdesk\.printing\.print\\(\\{ printBackground: true \\}\\)/);
- assert.match(app,/window\.brightdesk\.printing\.openPrinterSettings\\(\\)/);
+ assert.ok(app.includes("window.brightdesk.printing.print({ printBackground: true })"));
+ assert.ok(app.includes("window.brightdesk.printing.openPrinterSettings()"));
  assert.match(main,/registerPrintingIpcHandlers/);
  assert.match(preload,/printing:list-printers/);
 });
 
 test("all built-in language packs include printing labels",()=>{
- for(const locale of ["en-AU","de-DE","es-ES","fr-FR"]){const pack=JSON.parse(read(`src/languages/${locale}.json`));assert.ok(pack.translations["top.print"]);assert.ok(pack.translations["top.printerSettings"]);}
+ for(const locale of ["en-AU","de-DE","es-ES","fr-FR"]){const pack=JSON.parse(read(\`src/languages/\${locale}.json\`));assert.ok(pack.translations["top.print"]);assert.ok(pack.translations["top.printerSettings"]);}
 });
 
 test("macOS and Windows native printer discovery sources and build script are included",()=>{
@@ -45,8 +45,11 @@ test("all standalone installer configurations unpack native helpers and declare 
  ]) assert.ok(pkg.build.asarUnpack.includes(target),target);
  assert.deepEqual(pkg.build.mac.extendInfo.NSBonjourServices,["_ipp._tcp","_ipps._tcp","_printer._tcp"]);
  assert.match(pkg.build.mac.extendInfo.NSLocalNetworkUsageDescription,/printer/i);
+ for(const name of ["dist","dist:win","dist:mac","dist:linux","release"])assert.ok(pkg.scripts[name].includes("build:printing-native"),name);
  const config=read("electron-builder.app.config.js");
- assert.match(config,/src\\/printing-package\\/native\\/macos\\/brightdesk-ipp-discovery/);
+ const buildApp=read("scripts/build-app.js");
+ assert.ok(buildApp.includes("build-printing-native.js"));
+ assert.ok(config.includes("'src/printing-package/native/macos/brightdesk-ipp-discovery'"));
  assert.match(config,/NSBonjourServices/);
  assert.match(config,/NSLocalNetworkUsageDescription/);
 });
