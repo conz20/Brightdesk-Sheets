@@ -15,11 +15,11 @@
     "check:node": "node scripts/check-node24.js",
     "start": "electron .",
     "test": "node --test tests/app-repository-seeds.test.js tests/database-service.test.js tests/database-ui-integration.test.js tests/dictionary-service.test.js tests/file-service.test.js tests/forms-service.test.js tests/forms-ui-integration.test.js tests/formula.test.js tests/installer-agreement.test.js tests/integrated-app-shell.test.js tests/language-service.test.js tests/license-verification.test.js tests/lists-service.test.js tests/lists-ui-integration.test.js tests/node-runtime-setup.test.js tests/page-layout.test.js tests/planner-service.test.js tests/planner-ui-integration.test.js tests/rea-bench.test.js tests/release-readiness.test.js tests/resource-protection.test.js tests/standalone-downloads.test.js tests/standalone-pages.test.js tests/todo-service.test.js tests/todo-ui-integration.test.js tests/workspace-service.test.js tests/workspace-ui-integration.test.js tests/common-libs-storage.test.js && node --test test/printing-integration.test.mjs test/printing-adapter-virtual.test.mjs test/printing-ipc.test.mjs",
-    "dist": "npm run verify:licenses && electron-builder --publish never",
-    "dist:win": "npm run verify:licenses && electron-builder --win nsis --x64 --publish never",
-    "dist:mac": "npm run verify:licenses && electron-builder --mac dmg pkg zip --universal --publish never",
-    "dist:linux": "npm run verify:licenses && electron-builder --linux AppImage deb --x64 --publish never",
-    "release": "npm run verify:licenses && electron-builder --publish never",
+    "dist": "npm run build:printing-native && npm run verify:licenses && electron-builder --publish never",
+    "dist:win": "npm run build:printing-native && npm run verify:licenses && electron-builder --win nsis --x64 --publish never",
+    "dist:mac": "npm run build:printing-native && npm run verify:licenses && electron-builder --mac dmg pkg zip --universal --publish never",
+    "dist:linux": "npm run build:printing-native && npm run verify:licenses && electron-builder --linux AppImage deb --x64 --publish never",
+    "release": "npm run build:printing-native && npm run verify:licenses && electron-builder --publish never",
     "verify:licenses": "node scripts/verify-licenses.js",
     "postinstall": "npm run verify:licenses",
     "dist:apps:win": "node scripts/build-apps.js win",
@@ -80,7 +80,8 @@
     "dist:product:mac": "node scripts/build-app.js sheets mac",
     "verify:product:mac": "node scripts/verify-standalone-apps.js mac release/apps sheets",
     "dist:product:linux": "node scripts/build-app.js sheets linux",
-    "verify:product:linux": "node scripts/verify-standalone-apps.js linux release/apps sheets"
+    "verify:product:linux": "node scripts/verify-standalone-apps.js linux release/apps sheets",
+    "build:printing-native": "node scripts/build-printing-native.js"
   },
   "dependencies": {
     "docx": "9.15.1",
@@ -136,7 +137,15 @@
         "zip"
       ],
       "category": "public.app-category.productivity",
-      "artifactName": "Brightdesk-${version}-${arch}.${ext}"
+      "artifactName": "Brightdesk-${version}-${arch}.${ext}",
+      "extendInfo": {
+        "NSBonjourServices": [
+          "_ipp._tcp",
+          "_ipps._tcp",
+          "_printer._tcp"
+        ],
+        "NSLocalNetworkUsageDescription": "Brightdesk Sheets uses your local network to discover printers you choose to use."
+      }
     },
     "dmg": {
       "sign": false
@@ -158,7 +167,11 @@
       "welcome": "installer/mac-welcome.txt",
       "conclusion": "installer/mac-conclusion.txt",
       "installLocation": "/Applications"
-    }
+    },
+    "asarUnpack": [
+      "src/printing-package/native/macos/brightdesk-ipp-discovery",
+      "src/printing-package/native/windows/brightdesk-ipp-discovery.exe"
+    ]
   },
   "desktopName": "org.brightdesk.suite.desktop",
   "brightdeskAppId": "sheets"
