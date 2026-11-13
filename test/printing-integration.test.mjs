@@ -121,7 +121,7 @@ test("keeps discovered network printer addresses and service URIs out of product
     const printers = await discoverNetworkPrinterServices({
       platform: "linux",
       async runCommand() {
-        return { stdout: `${serviceUri}\\n` };
+        return { stdout: `${serviceUri}\n` };
       }
     });
 
@@ -147,7 +147,7 @@ test("keeps friendly DNS-SD printer names without exposing their service URI", a
   const printers = await discoverNetworkPrinterServices({
     platform: "linux",
     async runCommand() {
-      return { stdout: `${serviceUri}\\n` };
+      return { stdout: `${serviceUri}\n` };
     }
   });
 
