@@ -14,8 +14,8 @@ test("Printing snapshot is the dependency-free approved upstream version",()=>{
 test("the Sheets workspace contains shared Print actions",()=>{
  const html=read("src/index.html"),app=read("src/app.js"),main=read("src/main.js"),preload=read("src/preload.js");
  assert.match(html,/id="print-button"/);assert.match(html,/id="printer-settings-button"/);
- assert.match(app,/window\\.brightdesk\\.printing\\.print\\(\\{ printBackground: true \\}\\)/);
- assert.match(app,/window\\.brightdesk\\.printing\\.openPrinterSettings\\(\\)/);
+ assert.match(app,/window\.brightdesk\.printing\.print\\(\\{ printBackground: true \\}\\)/);
+ assert.match(app,/window\.brightdesk\.printing\.openPrinterSettings\\(\\)/);
  assert.match(main,/registerPrintingIpcHandlers/);
  assert.match(preload,/printing:list-printers/);
 });
@@ -32,9 +32,9 @@ test("macOS and Windows native printer discovery sources and build script are in
   "src/printing-package/tools/build-macos-printer-discovery.sh",
   "src/printing-package/tools/build-windows-printer-discovery.ps1",
  ]) assert.ok(fs.statSync(path.join(process.cwd(),file)).isFile(),file);
- assert.match(script,/build-macos-printer-discovery\\.sh/);
- assert.match(script,/build-windows-printer-discovery\\.ps1/);
- assert.match(script,/process\\.platform/);
+ assert.match(script,/build-macos-printer-discovery\.sh/);
+ assert.match(script,/build-windows-printer-discovery\.ps1/);
+ assert.match(script,/process\.platform/);
 });
 
 test("all standalone installer configurations unpack native helpers and declare macOS local-network access",()=>{
