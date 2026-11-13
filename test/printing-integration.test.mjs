@@ -21,7 +21,7 @@ test("the Sheets workspace contains shared Print actions",()=>{
 });
 
 test("all built-in language packs include printing labels",()=>{
- for(const locale of ["en-AU","de-DE","es-ES","fr-FR"]){const pack=JSON.parse(read(\`src/languages/\${locale}.json\`));assert.ok(pack.translations["top.print"]);assert.ok(pack.translations["top.printerSettings"]);}
+ for(const locale of ["en-AU","de-DE","es-ES","fr-FR"]){const pack=JSON.parse(read("src/languages/"+locale+".json"));assert.ok(pack.translations["top.print"]);assert.ok(pack.translations["top.printerSettings"]);}
 });
 
 test("macOS and Windows native printer discovery sources and build script are included",()=>{
