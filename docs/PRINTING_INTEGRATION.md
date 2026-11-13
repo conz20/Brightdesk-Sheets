@@ -8,6 +8,9 @@ The Electron main process creates one adapter per `webContents` instance. Six na
 
 The Print action first reads the operating-system queue list. When a queue is available, the adapter uses Electron's visible print dialog. Brightdesk does not silently add a queue, pair a device, install a driver or upload document contents to an external service.
 
+
+**Customer-facing UI boundary:** the renderer currently connects only queue listing, Print and Printer settings. Network discovery, user-approved WSD pairing and capability lookup are exposed through protected IPC/preload APIs but are not wired to a customer-facing screen. Users must add the printer through operating-system settings before it becomes a usable queue.
+
 ## Native discovery and packaging
 
 - macOS builds `native/macos/ipp-printer-discovery.swift` with Apple's Swift compiler and Network framework. The macOS Info.plist declares `_ipp._tcp`, `_ipps._tcp`, `_printer._tcp` and the local-network usage description.
