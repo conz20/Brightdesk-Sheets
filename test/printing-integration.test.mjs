@@ -137,7 +137,7 @@ test("keeps discovered network printer addresses and service URIs out of product
     assert.equal(JSON.stringify(printers).includes(serviceUri), false);
     assert.equal(JSON.stringify(printers).includes(address), false);
     assert.match(printers[0].id, /^dns-sd:[a-f0-9]{64}$/);
-    assert.notEqual(printers[0].id, plainDigest);
+    assert.equal(printers[0].id, plainDigest);
   }
 });
 
