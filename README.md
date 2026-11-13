@@ -115,6 +115,10 @@ The Windows, macOS and Linux installer matrix remains available through a manual
 
 The [GridCraft reference study and Brightdesk Sheets roadmap](docs/GRIDCRAFT_REFERENCE_AND_SHEETS_ROADMAP.md) records feature research, the current verified first-use scope, proposed priorities, acceptance evidence and licensing boundaries. It is a development roadmap, not a claim of GridCraft or Excel parity.
 
+## Test discovery
+
+`npm test` uses Node.js 24 automatic test discovery so newly added regression files are included without maintaining a manual list. Suite-only catalogue and integrated release-contract tests carry explicit skip annotations in standalone products; they are not silently omitted. The dictionary service regression also verifies that an unbundled catalogue entry cannot trigger a network request.
+
 ## Documentation freshness
 
 The root README is maintained alongside the product, not as an end-of-project task. Every pull request that changes application code, tests, UI, design assets, screenshots, icons, configuration, dependencies, packaging, or build/release workflows must also update this README in the same pull request. Keep feature status, screenshots and visual references, application icons, setup/build instructions, platform compatibility, and repository links aligned with the latest verified implementation. Describe planned or untested functionality as planned, never as completed. The **README freshness** GitHub Actions check requires a root `README.md` update whenever a pull request or direct push to `main` changes a non-Markdown file; a passing check confirms inclusion, while reviewers remain responsible for checking factual accuracy and current visuals.
