@@ -49,12 +49,13 @@ These are configured build targets, not confirmation that a package has passed i
 
 - Edit values in a spreadsheet grid and use the formula bar.
 - Work across named worksheets: add, switch, rename, reorder and delete tabs. The final worksheet cannot be deleted.
+- Navigate directly to a cell with the Name Box, edit its raw value or formula in a dedicated formula bar, and adjust worksheet zoom from the status bar.
 - Existing single-grid workbooks migrate to a first worksheet without changing their saved cell values.
 - Calculate basic arithmetic and supported range functions, including SUM, AVERAGE, MIN, MAX, COUNT and COUNTA.
 - Add rows and columns, sort a selected column, and import/export CSV and XLSX files. XLSX carries all worksheets; CSV import/export applies to one worksheet at a time.
 - Keep workbook data and worksheet names on the device as part of the Brightdesk project.
 
-**Implementation status:** Multi-worksheet migration, tab operations and multi-worksheet XLSX exchange are under review in the current development change. Do not treat this work as release-verified until the exact-head tests and platform checks pass.
+**Implementation status:** The current draft development change also adds direct Name Box navigation, a dedicated formula bar and worksheet status/zoom controls. All of these changes remain under review; do not treat them as release-verified until exact-head tests and platform checks pass. Do not treat this work as release-verified until the exact-head tests and platform checks pass.
 
 **Known boundaries:** Cross-worksheet formulas, VBA/macros, pivot tables, advanced formula coverage, complex workbook features and exact Excel round-trip compatibility are not established.
 ## Download
