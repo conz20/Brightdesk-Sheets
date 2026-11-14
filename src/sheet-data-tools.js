@@ -10,7 +10,7 @@
   const MAX_CELL_TEXT = 32_767;
   const MAX_ROWS = 1_048_576;
   const cellAddressPattern = /^([A-Z]{1,3})([1-9]\d*)$/i;
-  const formulaReferencePattern = /(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]{1,3})([1-9]\d*)|([A-Z]{1,3})([1-9]\d*)/gi;
+  const formulaReferencePattern = /(?<![A-Z0-9_.])(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]{1,3})([1-9]\d*)|(?<![A-Z0-9_.])([A-Z]{1,3})([1-9]\d*)/gi;
 
   function createAutoFilterState() {
     return { enabled: false, filters: {} };
