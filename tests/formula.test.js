@@ -135,3 +135,26 @@ test('supports scientific notation constants without confusing exponent digits f
   assert.equal(calculateCell(cells, 0, 0), 1000.25);
   assert.equal(calculateCell(cells, 0, 2), 1100.25);
 });
+
+test('formula calculations preserve zero-padded and high-precision identifiers as text', () => {
+  const cells = [[
+    '00123',
+    '-00456',
+    '12345678901234567',
+    '10',
+    '=A1+1',
+    '=SUM(A1:C1)',
+    '=COUNT(A1:C1)',
+    '=COUNTA(A1:C1)',
+    '=SUM(D1:D1)'
+  ]];
+
+  assert.equal(calculateCell(cells, 0, 0), '00123');
+  assert.equal(calculateCell(cells, 0, 1), '-00456');
+  assert.equal(calculateCell(cells, 0, 2), '12345678901234567');
+  assert.equal(calculateCell(cells, 0, 4), '#VALUE!');
+  assert.equal(calculateCell(cells, 0, 5), 0);
+  assert.equal(calculateCell(cells, 0, 6), 0);
+  assert.equal(calculateCell(cells, 0, 7), 3);
+  assert.equal(calculateCell(cells, 0, 8), 10);
+});
