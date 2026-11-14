@@ -56,7 +56,9 @@ test('renames worksheets and rejects invalid or duplicate names', () => {
   const workbook = normalizeWorkbook({ cells: [['x']] });
   addWorksheet(workbook, 'Costs');
   assert.throws(() => renameWorksheet(workbook, 'sheet-1', 'costs'), /already exists/i);
-  assert.throws(() => renameWorksheet(workbook, 'sheet-1', 'bad/name'), /cannot contain/i);
+  for (const invalid of ['bad/name', 'bad\\\\name', 'bad:name', 'bad?name', 'bad*name', 'bad[name', 'bad]name']) {
+    assert.throws(() => renameWorksheet(workbook, 'sheet-1', invalid), /cannot contain/i);
+  }
   assert.throws(() => renameWorksheet(workbook, 'sheet-1', 'x'.repeat(32)), /31 characters/i);
   renameWorksheet(workbook, 'sheet-1', 'Overview');
   assert.equal(workbook.worksheets[0].name, 'Overview');
