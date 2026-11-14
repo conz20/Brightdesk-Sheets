@@ -9,7 +9,7 @@ The Electron main process creates one adapter per `webContents` instance. Six na
 The Print action first reads the operating-system queue list. When a queue is available, the adapter uses Electron's visible print dialog. Sheets requests landscape orientation for the spreadsheet view. Brightdesk does not silently add a queue, pair a device, install a driver or upload document contents to an external service.
 
 
-**Customer-facing UI boundary:** the renderer currently connects only queue listing, Print and Printer settings. Network discovery, user-approved WSD pairing and capability lookup are exposed through protected IPC/preload APIs but are not wired to a customer-facing screen. Users must add the printer through operating-system settings before it becomes a usable queue.
+The renderer exposes a customer-facing **Find network printers** panel and a configured-printer list. Opening the panel does not begin a search; the user explicitly chooses **Search local network**. Results use safe display names and protocol labels. On Windows, eligible WSD results offer a separate user-approved **Pair** action; other discovered devices direct the user to operating-system printer settings. A discovered device is not yet a usable print queue. Brightdesk refreshes the operating-system queue list and only submits print jobs to queues the operating system exposes. The configured-printer panel can show normalized colour, duplex, paper-size, resolution and copy capabilities; unknown values remain unknown. The visible operating-system print dialog remains responsible for final printer choice and options. Successful submission means the operating system accepted the job; it does not prove that a physical page was printed.
 
 ## Native discovery and packaging
 
