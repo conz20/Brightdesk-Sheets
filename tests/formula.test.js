@@ -170,3 +170,11 @@ test('formula references do not turn non-zero underflow values into zero', () =>
   assert.equal(calculateCell(cells, 0, 5), 1);
   assert.equal(calculateCell(cells, 0, 6), 2);
 });
+
+test('aggregate functions accept numeric and scientific-notation constants', () => {
+  const cells = [['=SUM(1e3, 2.5e-1)', '=AVERAGE(1, 3)', '=COUNT(1, 2.5e-1)']];
+
+  assert.equal(calculateCell(cells, 0, 0), 1000.25);
+  assert.equal(calculateCell(cells, 0, 1), 2);
+  assert.equal(calculateCell(cells, 0, 2), 2);
+});
