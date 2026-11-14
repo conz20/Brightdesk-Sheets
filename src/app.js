@@ -999,6 +999,7 @@ function importProject(data){
   if(data?.docs && typeof data.docs === 'object'){
     state.docs={...clone(defaults),...data.docs};
     for (const id of Object.keys(configs)) if (!state.docs[id] || typeof state.docs[id] !== 'object') state.docs[id] = clone(defaults[id]);
+    state.docs.sheets = workbookModel.normalizeWorkbook(state.docs.sheets, defaults.sheets.cells);
     const preferred = configs[state.app] ? state.app : 'pages';
     const target = state.setupComplete && installedApp(preferred) ? preferred : 'pages';
     if (!state.setupComplete || !installedApp(target)) { state.installedApps = [target]; state.setupComplete = true; }
