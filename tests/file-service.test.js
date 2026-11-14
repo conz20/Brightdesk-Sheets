@@ -482,7 +482,7 @@ test('XLSX round trip retains named Excel tables with data rows and Brightdesk t
     worksheets: [{
       id: 'sales',
       name: 'Sales',
-      cells: [['Product', 'Amount'], ['Pen', '10'], ['Paper', '20']],
+      cells: [['Product', 'Amount'], ['Pen', 10], ['Paper', 20]],
       tables: [table]
     }]
   };
