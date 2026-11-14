@@ -21,7 +21,7 @@ function trimSnapshots(history, side) {
 
 function createHistory(options = {}) {
   const limit = Number.isInteger(options.limit) && options.limit > 0 ? options.limit : 100;
-  const maxBytes = Number.isInteger(options.maxBytes) && options.maxBytes > 0 ? options.maxBytes : 32 * 1024 * 1024;
+  const maxBytes = Number.isInteger(options.maxBytes) && options.maxBytes > 0 ? options.maxBytes : 64 * 1024 * 1024;
   const clone = typeof options.clone === 'function' ? options.clone : cloneValue;
   return { limit, maxBytes, clone, past: [], future: [], pastBytes: 0, futureBytes: 0 };
 }
