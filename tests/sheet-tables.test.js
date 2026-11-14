@@ -5,7 +5,10 @@ const {
   renameTable,
   removeTable,
   findTableAtCell,
-  applyTableStyles
+  applyTableStyles,
+  createWorkbookTable,
+  renameWorkbookTable,
+  removeWorkbookTable
 } = require('../src/sheet-tables');
 
 test('creates a named table with unique cleaned header names inside a selected range', () => {
@@ -50,7 +53,7 @@ test('rejects overlapping table ranges and out-of-grid selections', () => {
 });
 
 test('rejects invalid or excessive table ranges', () => {
-  assert.throws(() => createTable([], [['A']], { top: -1, left: 0, bottom: 0, right: 0 }, 'Invalid'), /valid table range/i);
+  assert.throws(() => createTable([], [['A']], { top: 0, left: 0, bottom: 0, right: 0 }, 'Invalid'), /valid table range/i);
   assert.throws(() => createTable([], Array.from({ length: 501 }, () => Array(500).fill('x')), {
     top: 0, left: 0, bottom: 500, right: 499
   }, 'HugeTable'), /250,000-cell limit/i);
@@ -83,4 +86,65 @@ test('applies Brightdesk green header and alternating body banding without chang
   assert.equal(styles.B2.fill, '#EDF7F1');
   assert.equal(styles.C2.fill, '#EDF7F1');
   assert.equal(styles.B3.fill, null);
+});
+
+function createWorkbookFixture() {
+  const existingTable = {
+    id: 'table-7',
+    name: 'CostsTable',
+    range: { top: 0, left: 0, bottom: 1, right: 0 },
+    columns: ['Cost'],
+    headerRow: true,
+    totalsRow: false,
+    style: 'brightdesk-green'
+  };
+  return {
+    activeWorksheetId: 'sales',
+    cells: [['Product', 'Amount'], ['Pen', '10'], ['Paper', '20']],
+    styles: { A2: { italic: true } },
+    tables: [],
+    worksheets: [
+      { id: 'sales', name: 'Sales', cells: [], styles: {}, tables: [] },
+      { id: 'costs', name: 'Costs', cells: [['Cost'], ['5']], styles: {}, tables: [existingTable] }
+    ]
+  };
+}
+
+test('creates and styles a table on the active worksheet without changing other worksheets', () => {
+  const workbook = createWorkbookFixture();
+  const table = createWorkbookTable(workbook, { top: 0, left: 0, bottom: 2, right: 1 }, 'SalesTable');
+
+  assert.equal(table.name, 'SalesTable');
+  assert.equal(table.id, 'table-1');
+  assert.deepEqual(table.columns, ['Product', 'Amount']);
+  assert.deepEqual(workbook.cells[0], ['Product', 'Amount']);
+  assert.deepEqual(workbook.worksheets[0].cells, workbook.cells);
+  assert.equal(workbook.tables[0].name, 'SalesTable');
+  assert.equal(workbook.worksheets[0].tables[0].name, 'SalesTable');
+  assert.equal(workbook.styles.A1.bold, true);
+  assert.equal(workbook.styles.A1.fill, '#27845C');
+  assert.equal(workbook.styles.A2.italic, true);
+  assert.equal(workbook.styles.A2.fill, '#EDF7F1');
+  assert.equal(workbook.worksheets[1].tables[0].name, 'CostsTable');
+});
+
+test('rejects workbook-wide duplicate names and renames or removes only the active worksheet table', () => {
+  const workbook = createWorkbookFixture();
+  assert.throws(
+    () => createWorkbookTable(workbook, { top: 0, left: 0, bottom: 2, right: 1 }, 'CostsTable'),
+    /already exists/i
+  );
+
+  const table = createWorkbookTable(workbook, { top: 0, left: 0, bottom: 2, right: 1 }, 'SalesTable');
+  assert.throws(() => renameWorkbookTable(workbook, table.id, 'CostsTable'), /already exists/i);
+
+  const renamed = renameWorkbookTable(workbook, table.id, 'AnnualSales');
+  assert.equal(renamed.name, 'AnnualSales');
+  assert.equal(workbook.worksheets[0].tables[0].name, 'AnnualSales');
+
+  const removed = removeWorkbookTable(workbook, table.id);
+  assert.equal(removed.name, 'AnnualSales');
+  assert.deepEqual(workbook.tables, []);
+  assert.deepEqual(workbook.worksheets[0].tables, []);
+  assert.equal(workbook.worksheets[1].tables[0].name, 'CostsTable');
 });
