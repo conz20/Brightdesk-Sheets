@@ -976,6 +976,8 @@ function renameWorksheetFromPrompt(worksheetId) {
     recordSheetHistory();
     workbookModel.renameWorksheet(activeDoc(), worksheetId, requestedName);
     renderSheetTabs();
+    renderSheet();
+    renderToolbar();
     persist();
   } catch (error) { window.alert(error.message); }
 }
