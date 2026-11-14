@@ -124,6 +124,41 @@ function ensureCellExists(cells, row, col, maxCells = MAX_SHEET_CELLS) {
   return cells[row];
 }
 
+function assertGrid(cells) {
+  if (!Array.isArray(cells) || cells.some(line => !Array.isArray(line))) {
+    throw new TypeError('The worksheet must contain a valid cell grid.');
+  }
+}
+
+function appendSheetRow(cells, maxCells = MAX_SHEET_CELLS) {
+  assertGrid(cells);
+  if (!Number.isSafeInteger(maxCells) || maxCells < 1) throw new TypeError('The spreadsheet cell limit is invalid.');
+  const columns = Math.max(1, cells.reduce((maximum, line) => Math.max(maximum, line.length), 0));
+  const rows = Math.max(1, cells.length) + 1;
+  if (rows > MAX_EXCEL_ROWS) throw new RangeError('The worksheet has reached the 1,048,576-row limit.');
+  if (rows > Math.floor(maxCells / columns)) throw new RangeError('Adding a row would exceed the 250,000-cell limit.');
+  const result = cells.map(line => line.slice());
+  result.push(Array(columns).fill(''));
+  return result;
+}
+
+function appendSheetColumn(cells, maxCells = MAX_SHEET_CELLS) {
+  assertGrid(cells);
+  if (!Number.isSafeInteger(maxCells) || maxCells < 1) throw new TypeError('The spreadsheet cell limit is invalid.');
+  const rows = Math.max(1, cells.length);
+  const currentColumns = cells.reduce((maximum, line) => Math.max(maximum, line.length), 0);
+  const columns = currentColumns + 1;
+  if (columns > MAX_EXCEL_COLUMNS) throw new RangeError('The worksheet has reached the 16,384-column limit.');
+  if (rows > Math.floor(maxCells / columns)) throw new RangeError('Adding a column would exceed the 250,000-cell limit.');
+  const result = cells.map(line => {
+    const next = line.slice();
+    while (next.length < columns) next.push('');
+    return next;
+  });
+  if (!result.length) result.push(['']);
+  return result;
+}
+
 return {
   MAX_EXCEL_ROWS,
   MAX_EXCEL_COLUMNS,
@@ -133,6 +168,8 @@ return {
   parseCellAddress,
   formatCellAddress,
   getKeyboardNavigationTarget,
-  ensureCellExists
+  ensureCellExists,
+  appendSheetRow,
+  appendSheetColumn
 };
 });
