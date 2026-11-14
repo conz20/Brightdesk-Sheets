@@ -53,6 +53,7 @@ test('worksheet filter menus can be dismissed without applying pending choices',
 test('filtered keyboard navigation focuses the resolved visible row, not the hidden target', () => {
   const app = read('src/app.js');
   assert.ok(app.includes('visibleRows.includes(nextTarget.row)'));
-  assert.ok(app.includes('data-row="' + "' + nextTarget.row + '" + '"]'));
-  assert.ok(!app.includes('data-row="${target.row}"][data-col="${target.col}"'));
+  const navigation = app.slice(app.indexOf('let next = sheetWrap.querySelector'), app.indexOf('persist();', app.indexOf('let next = sheetWrap.querySelector')));
+  assert.ok(navigation.includes("' + nextTarget.row + '"));
+  assert.ok(!navigation.includes('${target.row}'));
 });
