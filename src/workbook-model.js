@@ -17,6 +17,25 @@ function createEmptyGrid(rows = DEFAULT_ROW_COUNT, columns = DEFAULT_COLUMN_COUN
   return Array.from({ length: rows }, () => Array(columns).fill(''));
 }
 
+function cloneCellStyles(styles) {
+  if (!styles || typeof styles !== 'object' || Array.isArray(styles)) return {};
+  const result = {};
+  const numberFormats = new Set(['general', 'number', 'currency', 'percent', 'date']);
+  for (const [address, value] of Object.entries(styles)) {
+    if (!/^[A-Z]{1,3}[1-9]\\d*$/i.test(address) || !value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const style = {};
+    for (const key of ['bold', 'italic', 'underline']) {
+      if (typeof value[key] === 'boolean') style[key] = value[key];
+    }
+    for (const key of ['fill', 'color']) {
+      if (typeof value[key] === 'string' && /^#[0-9a-f]{6}$/i.test(value[key])) style[key] = value[key].toUpperCase();
+    }
+    if (numberFormats.has(value.numberFormat)) style.numberFormat = value.numberFormat;
+    if (Object.keys(style).length) result[address.toUpperCase()] = style;
+  }
+  return result;
+}
+
 function makeUniqueName(candidate, usedNames) {
   const base = String(candidate || '').trim().slice(0, 31) || 'Sheet';
   if (!usedNames.has(base.toLocaleLowerCase())) return base;
@@ -47,7 +66,12 @@ function normalizeWorkbook(document, fallbackCells = createEmptyGrid()) {
     const requestedName = typeof sheet?.name === 'string' && sheet.name.trim() ? sheet.name.trim() : `Sheet${index + 1}`;
     const name = makeUniqueName(requestedName, usedNames);
     usedNames.add(name.toLocaleLowerCase());
-    return { id, name, cells: cloneGrid(sheet?.cells, fallbackCells) };
+    return {
+      id,
+      name,
+      cells: cloneGrid(sheet?.cells, fallbackCells),
+      styles: cloneCellStyles(sheet?.styles ?? (index === 0 ? source.styles : null))
+    };
   });
 
   const requestedActiveId = typeof source.activeWorksheetId === 'string' ? source.activeWorksheetId : '';
@@ -55,6 +79,7 @@ function normalizeWorkbook(document, fallbackCells = createEmptyGrid()) {
   normalized.activeWorksheetId = active.id;
   // Keep the legacy `cells` property as the active-sheet view for older readers.
   normalized.cells = cloneGrid(active.cells, fallbackCells);
+  normalized.styles = cloneCellStyles(active.styles);
   return normalized;
 }
 
@@ -65,6 +90,7 @@ function syncActiveWorksheet(document) {
   const active = document.worksheets.find(sheet => sheet.id === document.activeWorksheetId);
   if (!active) throw new Error('The active worksheet could not be found.');
   active.cells = cloneGrid(document.cells);
+  active.styles = cloneCellStyles(document.styles);
   return document;
 }
 
@@ -74,6 +100,7 @@ function activateWorksheet(document, worksheetId) {
   if (!target) throw new Error('The selected worksheet could not be found.');
   document.activeWorksheetId = target.id;
   document.cells = cloneGrid(target.cells);
+  document.styles = cloneCellStyles(target.styles);
   return document;
 }
 
@@ -85,7 +112,7 @@ function addWorksheet(document, requestedName) {
   const name = makeUniqueName(suggested, usedNames);
   let number = 1;
   while (usedIds.has(`sheet-${number}`)) number += 1;
-  const worksheet = { id: `sheet-${number}`, name, cells: createEmptyGrid() };
+  const worksheet = { id: `sheet-${number}`, name, cells: createEmptyGrid(), styles: {} };
   document.worksheets.push(worksheet);
   document.activeWorksheetId = worksheet.id;
   document.cells = cloneGrid(worksheet.cells);
@@ -117,6 +144,7 @@ function deleteWorksheet(document, worksheetId) {
     const next = document.worksheets[Math.min(index, document.worksheets.length - 1)];
     document.activeWorksheetId = next.id;
     document.cells = cloneGrid(next.cells);
+    document.styles = cloneCellStyles(next.styles);
   }
   return document;
 }
@@ -136,6 +164,7 @@ return {
   DEFAULT_ROW_COUNT,
   DEFAULT_COLUMN_COUNT,
   createEmptyGrid,
+  cloneCellStyles,
   normalizeWorkbook,
   syncActiveWorksheet,
   activateWorksheet,
