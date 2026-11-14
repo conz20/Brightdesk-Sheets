@@ -499,7 +499,7 @@ function applyExcelCellStyle(cell, style) {
     date: 'dd/mm/yyyy'
   };
   if (style.numberFormat === 'date' && typeof cell.value === 'string') {
-    const match = cell.value.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+    const match = cell.value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (match) {
       const date = new Date(cell.value + 'T00:00:00.000Z');
       if (Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === cell.value) cell.value = date;
