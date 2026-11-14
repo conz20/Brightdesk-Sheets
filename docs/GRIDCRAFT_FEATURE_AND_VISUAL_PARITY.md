@@ -128,3 +128,47 @@ Each stage should be delivered as a small reviewed change. Use the repository's 
 
 A capability is **implemented** only when the real UI or supported command path works. It is **verified** only when its tests and relevant platform checks pass. It is **compatible** only for the formats and behaviors covered by fixtures. A screenshot of a design mock-up is not a running-app screenshot. A dependency, tab label, documentation entry or roadmap row is not proof of functionality.
 
+
+
+## Detailed interaction patterns to preserve in the Brightdesk build
+
+The supplied Workflows and Getting started pages add useful details that should be treated as part of the target experience:
+
+- **Point-mode formula entry:** while a formula is being edited, clicking or dragging across the grid inserts cell/range references. Different references receive distinguishable colours in the formula and on the grid.
+- **Fill and edit:** visible fill handle; Enter moves down, Tab moves right; F2 edits the active cell; Ctrl+D and Ctrl+R fill down/right; Ctrl+Z and Ctrl+Y undo/redo.
+- **Formula tools:** Insert Function with argument assistance and categorized function library; AutoSum; Name Manager and Define Name; Trace Precedents; Trace Dependents; Evaluate Formula; Show Formulas. Workbook formula storage should use canonical English function names even when the interface is localized.
+- **Cell formatting:** font, fill, borders, alignment, wrap text, merge/centre, currency/percentage/date formats, reusable Cell Styles, Format Painter and a complete Format Cells dialog.
+- **Table interaction:** Ctrl+T / Format as Table; header filter buttons; banded rows; optional header and total rows; named column references such as `Sales[Q1]`.
+- **Charts:** recommended chart insertion; selecting a chart outlines its source range; contextual Chart Design tab; switch rows/columns, chart type and chart elements; Format pane for title, legend, series and colours.
+- **Pivot tables:** source range/table selection, explicit confirmation before replacing occupied cells, a field list with Filters / Columns / Rows / Values areas, refresh and report-layout choices.
+- **Review and accessibility:** cell comments, notes, comment review, spell check, accessibility checker, sheet/workbook protection, editable ranges and workbook statistics.
+- **View:** Normal, Page Break Preview and Page Layout; show/hide formula bar, gridlines and headings; zoom and Zoom to Selection; Freeze Panes; multiple workbook windows; System/Light/Dark theme; interface size and language.
+- **File view and calculation:** New/Open/Recent, workbook information, Save As, Print/Export and Options. Per-workbook options include AutoSave, scrollbars, sheet-tab visibility, calculation mode (automatic, automatic except data tables, manual) and iterative-calculation limits. Brightdesk should adopt these only where they fit its local file model and safe persistence contract.
+- **Command discovery:** a top-right command search and an Automate command palette make a large ribbon discoverable. Commands must be searchable, named consistently and keyboard accessible.
+
+## Sample workbooks and acceptance walkthroughs
+
+Brightdesk should ship original, bundled sample workbooks that demonstrate real capabilities without needing an internet connection:
+
+1. **Household Budget:** accounting/currency formats, planned versus actual values, overspend highlighting, a percentage-used colour scale and a comparison chart.
+2. **Quarterly Sales Dashboard:** a formatted table with filter buttons and a totals row, conditional data bars and icon indicators, sparklines, a clustered column chart and a pie chart.
+3. **Gradebook:** formula-driven averages and letter grades, with formula references visible and a clear Formulas ribbon example.
+
+The samples are not decorative mock-ups. Each should be an editable workbook with automated assertions for important cell values, formulas, styles and chart/table source ranges. A sample is ready only when the actual Brightdesk application opens it and the displayed values agree with the test fixture.
+
+## Shortcut and keyboard-access baseline
+
+The reference's common workflow includes new/open/save, Save As, bold/italic/underline, undo/redo, copy/cut/paste, find/replace, Go To, Format Cells, create table, toggle filters, fill down/right, Flash Fill, insert today's date, show formulas, edit cell and recalculate, plus insert/next/previous worksheet shortcuts.
+
+Brightdesk should define a cross-platform shortcut map with Ctrl on Windows/Linux and the appropriate Command-key equivalent on macOS. Avoid claiming shortcut support until each shortcut is wired to the intended command and tested in the running desktop application. Ribbon access keys and command search should remain usable without a mouse.
+
+## Macro and workbook safety
+
+The reference distinguishes its own step macros from VBA. Brightdesk must make the same distinction explicit:
+
+- Never claim that imported VBA macros execute unless a separately reviewed, deliberately supported engine exists.
+- Do not silently execute macros or scripts embedded in imported workbooks.
+- Any future Brightdesk macro system must use a constrained, documented command set, explicit user invocation, reversible operations where possible and a visible action history.
+- Preserve unsupported macro content only when the chosen file adapter can do so safely; otherwise explain the loss before saving over the original file.
+- Password protection and encrypted workbook support require explicit design and security review. Do not imply that protecting a sheet is equivalent to encrypting a file.
+
