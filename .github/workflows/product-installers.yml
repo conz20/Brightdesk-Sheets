@@ -116,7 +116,7 @@ jobs:
       - run: npm run dist:product:${{ matrix.platform }}
       - run: npm run verify:product:${{ matrix.platform }}
       - name: Attach verified installer files to the unpublished release
-        uses: __RELEASE_ACTION__
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           tag_name: ${{ github.ref_name }}
           name: Brightdesk Sheets ${{ github.ref_name }}
@@ -135,7 +135,7 @@ jobs:
       contents: write
     steps:
       - name: Publish after all three platform builds and uploads pass
-        uses: __RELEASE_ACTION__
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           tag_name: ${{ github.ref_name }}
           name: Brightdesk Sheets ${{ github.ref_name }}
