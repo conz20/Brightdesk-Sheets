@@ -58,7 +58,7 @@ function ensureCellExists(cells, row, col, maxCells = MAX_SHEET_CELLS) {
   }
 
   const targetRows = Math.max(1, cells.length, row + 1);
-  const targetColumns = Math.max(12, col + 1, ...cells.map(line => line.length));
+  const targetColumns = cells.reduce((maximum, line) => Math.max(maximum, line.length), Math.max(12, col + 1));
   if (targetRows > Math.floor(maxCells / targetColumns)) {
     throw new RangeError('The requested cell exceeds the 250,000-cell limit.');
   }
