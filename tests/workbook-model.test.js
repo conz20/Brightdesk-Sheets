@@ -205,3 +205,50 @@ test('sanitizes invalid AutoFilter keys and values when recovering workbook data
   });
   assert.deepEqual(workbook.autoFilter, { enabled: true, filters: { '0': ['East', ''] } });
 });
+
+test('preserves table definitions independently for each worksheet', () => {
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'sales',
+    worksheets: [
+      { id: 'sales', name: 'Sales', cells: [['Product', 'Amount'], ['Pens', '10']], tables: [
+        { id: 'table-1', name: 'SalesTable', range: { top: 0, left: 0, bottom: 1, right: 1 }, columns: ['Product', 'Amount'], headerRow: true, totalsRow: false, style: 'brightdesk-green' }
+      ] },
+      { id: 'costs', name: 'Costs', cells: [['Item', 'Cost'], ['Paper', '5']], tables: [] }
+    ]
+  });
+  assert.equal(workbook.tables[0].name, 'SalesTable');
+  activateWorksheet(workbook, 'costs');
+  assert.deepEqual(workbook.tables, []);
+  workbook.tables.push({ id: 'table-2', name: 'CostsTable', range: { top: 0, left: 0, bottom: 1, right: 1 }, columns: ['Item', 'Cost'], headerRow: true, totalsRow: false, style: 'brightdesk-green' });
+  syncActiveWorksheet(workbook);
+  const restored = normalizeWorkbook(JSON.parse(JSON.stringify(workbook)));
+  assert.equal(restored.worksheets[0].tables[0].name, 'SalesTable');
+  assert.equal(restored.worksheets[1].tables[0].name, 'CostsTable');
+});
+
+test('new worksheets start without inheriting tables from the previous worksheet', () => {
+  const workbook = normalizeWorkbook({
+    cells: [['Name'], ['Value']],
+    tables: [{ id: 'table-1', name: 'OldTable', range: { top: 0, left: 0, bottom: 1, right: 0 }, columns: ['Name'], style: 'brightdesk-green' }]
+  });
+  addWorksheet(workbook, 'Summary');
+  assert.deepEqual(workbook.tables, []);
+  assert.equal(workbook.worksheets[0].tables[0].name, 'OldTable');
+  assert.deepEqual(workbook.worksheets[1].tables, []);
+});
+
+test('deleting the active worksheet restores the remaining worksheet tables', () => {
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'second',
+    worksheets: [
+      { id: 'first', name: 'First', cells: [['A'], ['1']], tables: [
+        { id: 'table-1', name: 'FirstTable', range: { top: 0, left: 0, bottom: 1, right: 0 }, columns: ['A'], style: 'brightdesk-green' }
+      ] },
+      { id: 'second', name: 'Second', cells: [['B'], ['2']], tables: [
+        { id: 'table-2', name: 'SecondTable', range: { top: 0, left: 0, bottom: 1, right: 0 }, columns: ['B'], style: 'brightdesk-green' }
+      ] }
+    ]
+  });
+  deleteWorksheet(workbook, 'second');
+  assert.equal(workbook.tables[0].name, 'FirstTable');
+});
