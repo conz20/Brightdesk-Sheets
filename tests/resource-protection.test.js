@@ -98,9 +98,13 @@ test('release workflow has working install and release permissions', () => {
   assert.match(workflow, /runner: \["self-hosted", "Windows", "X64"\]/);
   assert.match(workflow, /runner: \["self-hosted", "macOS", "ARM64"\]/);
   assert.match(workflow, /runner: \["self-hosted", "Linux", "X64"\]/);
-  const publish = workflow.slice(workflow.indexOf('  publish:'));
+  const publish = workflow.slice(workflow.indexOf('  publish-release:'));
   assert.match(publish, /if: github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/v'\)/);
   assert.match(publish, /tag_name: \$\{\{ github\.ref_name \}\}/);
   assert.match(publish, /contents: write/);
-  assert.match(publish, /needs: build/);
+  assert.match(publish, /needs: release-assets/);
+  assert.match(workflow, /prepare-release:[\\s\\S]*?draft: true/);
+  assert.match(workflow, /release-assets:[\\s\\S]*?fail_on_unmatched_files: true/);
+  assert.match(workflow, /draft: false/);
+  assert.doesNotMatch(workflow, /actions\\/(?:upload|download)-artifact/, 'release assets must not use Actions artifact storage');
 });
