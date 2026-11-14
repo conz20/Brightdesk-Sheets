@@ -6,7 +6,7 @@ Sheets uses the checked-in, dependency-free snapshot of `@brightdesk/printing` f
 
 The Electron main process creates one adapter per `webContents` instance. Six narrow IPC operations are registered only for the authorized main window: list configured printers, discover network printers, pair a discovered WSD printer, query capabilities, open system printer settings and submit a print request. The preload exposes only those operations through the context-isolated `brightdesk.printing` API.
 
-The Print action first reads the operating-system queue list. When a queue is available, the adapter uses Electron's visible print dialog. Brightdesk does not silently add a queue, pair a device, install a driver or upload document contents to an external service.
+The Print action first reads the operating-system queue list. When a queue is available, the adapter uses Electron's visible print dialog. Sheets requests landscape orientation for the spreadsheet view. Brightdesk does not silently add a queue, pair a device, install a driver or upload document contents to an external service.
 
 
 **Customer-facing UI boundary:** the renderer currently connects only queue listing, Print and Printer settings. Network discovery, user-approved WSD pairing and capability lookup are exposed through protected IPC/preload APIs but are not wired to a customer-facing screen. Users must add the printer through operating-system settings before it becomes a usable queue.
