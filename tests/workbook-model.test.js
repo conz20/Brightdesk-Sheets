@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { calculateCell } = require('../src/formula');
 const {
   createEmptyGrid,
   normalizeWorkbook,
@@ -319,4 +320,29 @@ test('renaming a worksheet quotes new names and escapes apostrophes in formula r
 
   assert.equal(workbook.worksheets[1].cells[0][0], "='O''Brien Data'!A1");
   assert.equal(workbook.worksheets[1].cells[0][1], "='O''Brien Data'!A1");
+});
+
+
+test('formulas still calculate after a referenced worksheet is renamed', () => {
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'summary',
+    worksheets: [
+      { id: 'revenue', name: 'Revenue', cells: [['10', '20']] },
+      { id: 'summary', name: 'Summary', cells: [[
+        '=Revenue!A1+Revenue!B1',
+        '=SUM(Revenue!A1:B1)',
+        "='Revenue'!A1"
+      ]] }
+    ]
+  });
+
+  renameWorksheet(workbook, 'revenue', 'Q4 Revenue');
+
+  const context = {
+    worksheets: workbook.worksheets,
+    activeWorksheetId: 'summary'
+  };
+  assert.equal(calculateCell(workbook.cells, 0, 0, new Set(), context), 30);
+  assert.equal(calculateCell(workbook.cells, 0, 1, new Set(), context), 30);
+  assert.equal(calculateCell(workbook.cells, 0, 2, new Set(), context), 10);
 });
