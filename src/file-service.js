@@ -142,7 +142,7 @@ function assertTableCollection(tables, rows, options = {}) {
     if (!isPlainObject(table) || typeof table.id !== 'string' || !table.id.trim() ||
         table.id.length > 128 || typeof table.name !== 'string' ||
         !/^[A-Za-z_][A-Za-z0-9_.]*$/.test(table.name) ||
-        /^[A-Z]{1,3}[1-9]\\d*$/i.test(table.name) || table.name.length > 255) {
+        /^[A-Z]{1,3}[1-9]\d*$/i.test(table.name) || table.name.length > 255) {
       throw new Error('The Brightdesk Sheets workbook contains an invalid table name or ID.');
     }
     const nameKey = table.name.toLocaleLowerCase();
