@@ -49,6 +49,13 @@ test('rejects targets that would exceed the workbook cell safety limit', () => {
   assert.deepEqual(cells, [['keep']]);
 });
 
+test('handles large existing grids without overflowing a spread operation', () => {
+  const cells = Array.from({ length: 250001 }, () => ['x']);
+  assert.throws(() => ensureCellExists(cells, 0, 0), /250,000-cell limit/i);
+  assert.equal(cells.length, 250001);
+  assert.equal(cells[0].length, 1);
+});
+
 test('rejects invalid grid structures before expanding them', () => {
   assert.throws(() => ensureCellExists(null, 1, 1), /valid cell grid/i);
   assert.throws(() => ensureCellExists([['x'], null], 1, 1), /valid cell grid/i);
