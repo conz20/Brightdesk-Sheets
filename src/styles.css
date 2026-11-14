@@ -369,3 +369,12 @@
   #toolbar{flex-wrap:wrap}
   .sheet-format-control{min-width:72px}
 }
+
+
+/* Brightdesk Sheets rectangular cell selection */
+.sheet .grid-cell.in-selected-range{
+  box-shadow:inset 0 0 0 1px rgba(39,132,92,.28);
+}
+.sheet .grid-cell.in-selected-range:focus{
+  box-shadow:inset 0 0 0 2px #27845C;
+}
