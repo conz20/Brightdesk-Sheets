@@ -98,7 +98,7 @@ function renameWorksheet(document, worksheetId, requestedName) {
   const name = String(requestedName ?? '').trim();
   if (!name) throw new Error('A worksheet name is required.');
   if (name.length > 31) throw new Error('Worksheet names can be no longer than 31 characters.');
-  if (/[\\/?*:[\\]]/.test(name)) throw new Error('Worksheet names cannot contain: \\ / ? * [ or ].');
+  if (/[\\/?*:[\]]/.test(name)) throw new Error('Worksheet names cannot contain: \\ / ? * [ or ].');
   const duplicate = document.worksheets.some(sheet => sheet.id !== worksheetId && sheet.name.toLocaleLowerCase() === name.toLocaleLowerCase());
   if (duplicate) throw new Error('A worksheet with that name already exists.');
   target.name = name;
