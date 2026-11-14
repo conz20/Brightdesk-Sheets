@@ -8,7 +8,8 @@ const {
   applyTableStyles,
   createWorkbookTable,
   renameWorkbookTable,
-  removeWorkbookTable
+  removeWorkbookTable,
+  updateWorkbookTableHeader
 } = require('../src/sheet-tables');
 
 test('creates a named table with unique cleaned header names inside a selected range', () => {
@@ -147,4 +148,26 @@ test('rejects workbook-wide duplicate names and renames or removes only the acti
   assert.deepEqual(workbook.tables, []);
   assert.deepEqual(workbook.worksheets[0].tables, []);
   assert.equal(workbook.worksheets[1].tables[0].name, 'CostsTable');
+});
+
+
+test('keeps table column names and normalized header cells in sync when a header is edited', () => {
+  const workbook = createWorkbookFixture();
+  const table = createWorkbookTable(workbook, { top: 0, left: 0, bottom: 2, right: 1 }, 'SalesTable');
+
+  const renamed = updateWorkbookTableHeader(workbook, 0, 1, 'Revenue');
+  assert.equal(renamed.id, table.id);
+  assert.deepEqual(renamed.columns, ['Product', 'Revenue']);
+  assert.deepEqual(workbook.cells[0], ['Product', 'Revenue']);
+  assert.deepEqual(workbook.worksheets[0].cells[0], ['Product', 'Revenue']);
+  assert.deepEqual(workbook.tables[0].columns, ['Product', 'Revenue']);
+  assert.deepEqual(workbook.worksheets[0].tables[0].columns, ['Product', 'Revenue']);
+  assert.equal(workbook.styles.B1.fill, '#27845C');
+
+  const duplicate = updateWorkbookTableHeader(workbook, 0, 1, 'Product');
+  assert.deepEqual(duplicate.columns, ['Product', 'Product 2']);
+  assert.deepEqual(workbook.cells[0], ['Product', 'Product 2']);
+  assert.deepEqual(workbook.worksheets[0].tables[0].columns, ['Product', 'Product 2']);
+
+  assert.equal(updateWorkbookTableHeader(workbook, 1, 1, '15'), null);
 });
