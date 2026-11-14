@@ -57,3 +57,23 @@ test('filtered keyboard navigation focuses the resolved visible row, not the hid
   assert.ok(navigation.includes("' + nextTarget.row + '"));
   assert.ok(!navigation.includes('${target.row}'));
 });
+
+
+test('editing a filtered cell moves focus when that edit hides the active row', () => {
+  const app = read('src/app.js');
+  assert.ok(app.includes('function refreshSheetAfterFilterableEdit'));
+  assert.ok(app.includes('const moved = keepSelectedSheetCellVisible()'));
+  assert.ok(app.includes('if (moved) {'));
+});
+
+test('formula-bar edits refresh filtered visibility and keep the selected cell reachable', () => {
+  const app = read('src/app.js');
+  const handler = app.slice(app.indexOf("$('formula-input').addEventListener('change'"), app.indexOf("$('sheet-zoom-out')", app.indexOf("$('formula-input').addEventListener('change'")));
+  assert.ok(handler.includes('refreshSheetAfterFilterableEdit'));
+});
+
+test('cut operations restore a visible selection after filtered rows are recalculated', () => {
+  const app = read('src/app.js');
+  const handler = app.slice(app.indexOf('function cutSelectedSheetCell'), app.indexOf('function pasteIntoSelectedSheetCell'));
+  assert.ok(handler.includes('keepSelectedSheetCellVisible'));
+});
