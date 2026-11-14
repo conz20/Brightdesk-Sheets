@@ -6,6 +6,8 @@ on:
       - '**/*.md'
       - '**/*.mdx'
   push:
+    branches: [main]
+    tags: ['v*']
     paths-ignore:
       - '**/*.md'
       - '**/*.mdx'
