@@ -105,3 +105,16 @@ test('renaming a worksheet refreshes the grid and toolbar after updating formula
   assert.ok(handler.includes('renderToolbar()'));
   assert.ok(handler.includes('persist()'));
 });
+
+
+test('sorting remaps references in other worksheets to the moved source rows', () => {
+  const app = read('src/app.js');
+  const start = app.indexOf('function sortSheetColumn(');
+  const end = app.indexOf('function applyPageLayout(', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = app.slice(start, end);
+  assert.ok(handler.includes('sorted.destinationBySourceRow'));
+  assert.ok(handler.includes('translateExternalFormulaRow('));
+  assert.ok(handler.includes('otherWorksheet.cells'));
+  assert.ok(handler.includes('workbookModel.syncActiveWorksheet') || handler.includes('persist()'));
+});
