@@ -42,19 +42,25 @@ const state = {
 const editor = $('editor'), sheetWrap = $('sheet-wrap'), slideWrap = $('slide-wrap'), notesWrap = $('notes-wrap');
 const pageLayout = window.BrightdeskPageLayout;
 const commonJsonStorage = window.BrightdeskCommonLibs;
+const workbookModel = window.BrightdeskWorkbookModel;
 if (!commonJsonStorage) throw new Error('Brightdesk common storage helper was not loaded.');
+if (!workbookModel) throw new Error('Brightdesk worksheet model was not loaded.');
 
 function clone(value) { return commonJsonStorage.cloneJsonValue(value); }
 function activeDoc() { return state.docs[state.app]; }
 function setStatus(message) { $('save-status').textContent = message; }
 function persist() {
-  try { commonJsonStorage.writeJsonValue(localStorage, 'brightdesk-docs-v3', state.docs); setStatus('Saved on this device'); }
-  catch (error) { setStatus('Could not save locally'); console.error(error); }
+  try {
+    if (state.docs.sheets && Array.isArray(state.docs.sheets.worksheets)) workbookModel.syncActiveWorksheet(state.docs.sheets);
+    commonJsonStorage.writeJsonValue(localStorage, 'brightdesk-docs-v3', state.docs);
+    setStatus('Saved on this device');
+  } catch (error) { setStatus('Could not save locally'); console.error(error); }
 }
 function loadLocal() {
   try {
     const stored = commonJsonStorage.readJsonValue(localStorage, 'brightdesk-docs-v3', { fallbackKeys: ['brightdesk-docs-v2'], fallbackValue: null });
     if (stored && typeof stored === 'object') state.docs = { ...clone(defaults), ...stored };
+    state.docs.sheets = workbookModel.normalizeWorkbook(state.docs.sheets, defaults.sheets.cells);
     const appSetup = commonJsonStorage.readJsonValue(localStorage, 'brightdesk-app-setup-v1', { fallbackValue: null });
     if (appSetup && Array.isArray(appSetup.installedApps)) {
       state.installedApps = launchAppId ? [launchAppId] : appSetup.installedApps.filter(id => installableCatalog.some(item => item.id === id));
@@ -264,6 +270,102 @@ function insertNoteText(value) { const input = $('notes-editor'); const start = 
 function addSlideWithContent(title, body) { activeDoc().slides.push({ title, body }); activeDoc().current = activeDoc().slides.length - 1; renderSlides(); renderToolbar(); persist(); }
 function setSlideTheme(theme) { state.slideTheme = theme; renderSlides(); setStatus(`${theme[0].toUpperCase()}${theme.slice(1)} theme selected`); }
 function setCell(row,col,value) { while (activeDoc().cells.length <= row) activeDoc().cells.push([]); while (activeDoc().cells[row].length <= col) activeDoc().cells[row].push(''); activeDoc().cells[row][col]=value; persist(); }
+function renameWorksheetFromPrompt(worksheetId) {
+  const worksheet = activeDoc().worksheets.find(sheet => sheet.id === worksheetId);
+  if (!worksheet) return;
+  const requestedName = window.prompt('Worksheet name', worksheet.name);
+  if (requestedName === null) return;
+  try {
+    workbookModel.renameWorksheet(activeDoc(), worksheetId, requestedName);
+    renderSheetTabs();
+    persist();
+  } catch (error) { window.alert(error.message); }
+}
+function deleteWorksheetWithConfirmation(worksheetId) {
+  const worksheet = activeDoc().worksheets.find(sheet => sheet.id === worksheetId);
+  if (!worksheet) return;
+  if (!window.confirm(`Delete the worksheet “${worksheet.name}”? This cannot be undone.`)) return;
+  try {
+    workbookModel.deleteWorksheet(activeDoc(), worksheetId);
+    state.selectedCell = { row: 0, col: 0 };
+    renderSheet();
+    renderToolbar();
+    persist();
+  } catch (error) { window.alert(error.message); }
+}
+function renderSheetTabs() {
+  const container = $('sheet-tabs');
+  if (!container) return;
+  const doc = activeDoc();
+  const worksheets = Array.isArray(doc.worksheets) ? doc.worksheets : [];
+  container.innerHTML = '';
+  const list = document.createElement('div');
+  list.className = 'sheet-tab-list';
+  list.setAttribute('role', 'tablist');
+  list.setAttribute('aria-label', 'Worksheets');
+  let draggedWorksheetId = '';
+  worksheets.forEach((worksheet, index) => {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'sheet-tab';
+    tab.textContent = worksheet.name;
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', String(worksheet.id === doc.activeWorksheetId));
+    tab.setAttribute('aria-controls', 'sheet-wrap');
+    tab.title = 'Drag to reorder. Double-click or use Rename to change this worksheet name.';
+    tab.draggable = true;
+    tab.addEventListener('click', () => {
+      if (worksheet.id === doc.activeWorksheetId) return;
+      workbookModel.activateWorksheet(doc, worksheet.id);
+      state.selectedCell = { row: 0, col: 0 };
+      renderSheet();
+      renderToolbar();
+      persist();
+    });
+    tab.addEventListener('dblclick', () => renameWorksheetFromPrompt(worksheet.id));
+    tab.addEventListener('keydown', event => {
+      if (event.key === 'F2') { event.preventDefault(); renameWorksheetFromPrompt(worksheet.id); }
+    });
+    tab.addEventListener('dragstart', event => {
+      draggedWorksheetId = worksheet.id;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', worksheet.id);
+      tab.classList.add('dragging');
+    });
+    tab.addEventListener('dragend', () => { draggedWorksheetId = ''; tab.classList.remove('dragging'); });
+    tab.addEventListener('dragover', event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; });
+    tab.addEventListener('drop', event => {
+      event.preventDefault();
+      const movedId = draggedWorksheetId || event.dataTransfer.getData('text/plain');
+      if (!movedId || movedId === worksheet.id) return;
+      const from = doc.worksheets.findIndex(item => item.id === movedId);
+      if (from < 0) return;
+      workbookModel.moveWorksheet(doc, movedId, index);
+      renderSheetTabs();
+      persist();
+    });
+    list.append(tab);
+  });
+  const actions = document.createElement('div');
+  actions.className = 'sheet-tab-actions';
+  const add = document.createElement('button');
+  add.type = 'button'; add.className = 'sheet-tab-action'; add.textContent = '+ Sheet';
+  add.setAttribute('aria-label', 'Add worksheet'); add.title = 'Add worksheet';
+  add.addEventListener('click', () => {
+    workbookModel.addWorksheet(doc);
+    state.selectedCell = { row: 0, col: 0 };
+    renderSheet(); renderToolbar(); persist();
+  });
+  const rename = document.createElement('button');
+  rename.type = 'button'; rename.className = 'sheet-tab-action'; rename.textContent = 'Rename';
+  rename.addEventListener('click', () => renameWorksheetFromPrompt(doc.activeWorksheetId));
+  const remove = document.createElement('button');
+  remove.type = 'button'; remove.className = 'sheet-tab-action'; remove.textContent = 'Delete';
+  remove.disabled = worksheets.length <= 1;
+  remove.addEventListener('click', () => deleteWorksheetWithConfirmation(doc.activeWorksheetId));
+  actions.append(add, rename, remove);
+  container.append(list, actions);
+}
 function refreshSheetValues() {
   sheetWrap.querySelectorAll('input.grid-cell').forEach(input => {
     if (document.activeElement === input) return;
@@ -287,6 +389,7 @@ function renderSheet() {
       input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();setCell(r,c,input.value);const next=sheetWrap.querySelector(`input[data-row="${r+1}"][data-col="${c}"]`);next?.focus();refreshSheetValues();}});td.append(input);tr.append(td);}
     tbody.append(tr);
   }); table.append(tbody); sheetWrap.innerHTML=''; sheetWrap.append(table);
+  renderSheetTabs();
 }
 function renderSlides() {
   const doc=activeDoc(); if(!Array.isArray(doc.slides)||!doc.slides.length)doc.slides=[{title:t('common.newSlide'),body:''}];
@@ -839,6 +942,7 @@ function render() {
     const isDatabase = state.app === 'database';
     const isWorkspace = state.app === 'loop';
     $('todo-wrap').hidden = !isTodo; $('lists-wrap').hidden = !isLists; $('forms-wrap').hidden = !isForms; $('planner-wrap').hidden = !isPlanner; $('database-wrap').hidden = !isDatabase; $('workspace-app-wrap').hidden = !isWorkspace;
+    $('sheet-tabs').hidden = state.app !== 'sheets';
     $('open-button').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('save-project').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('export-button').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace;
     document.querySelector('.document-bar').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('ribbon-tabs').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('toolbar').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace;
     editor.hidden = !['pages'].includes(state.app); sheetWrap.hidden = state.app !== 'sheets'; slideWrap.hidden = state.app !== 'slides'; notesWrap.hidden = !['notes'].includes(state.app);
@@ -881,7 +985,10 @@ function collectDocxBlocks() {
 function exportPayload(){
   const doc=activeDoc(),title=$('doc-title').value||'Brightdesk file';doc.title=title;
   if(state.app==='pages')return {kind:'pages',title,html:editor.innerHTML,blocks:collectDocxBlocks()};
-  if(state.app==='sheets')return {kind:'sheets',title,rows:doc.cells||[]};
+  if(state.app==='sheets') {
+    workbookModel.syncActiveWorksheet(doc);
+    return { kind: 'sheets', title, rows: doc.cells || [], worksheets: doc.worksheets, activeWorksheetId: doc.activeWorksheetId };
+  }
   if(state.app==='slides')return {kind:'slides',title,slides:doc.slides||[]};
   return {kind:'notes',title,text:$('notes-editor').value||''};
 }
@@ -901,14 +1008,23 @@ function importProject(data){
   const kind=data?.kind;if(!configs[kind])throw new Error('This file could not be imported.');
   if (!installedApp(kind)) { state.installedApps.push(kind); state.setupComplete = true; saveAppSetup(); }
   if(kind==='pages')state.docs.pages={title:data.title||'Imported document',html:data.html?safeHtml(data.html):`<p>${escapeHtml(data.text||'')}</p>`};
-  if(kind==='sheets')state.docs.sheets={title:data.title||'Imported spreadsheet',cells:(data.cells||[]).map(row=>row.map(v=>String(v??'')))};
+  if(kind==='sheets') {
+    const cells = (data.cells || []).map(row => row.map(value => String(value ?? '')));
+    const worksheets = Array.isArray(data.worksheets) ? data.worksheets.map(sheet => ({
+      ...sheet,
+      cells: (sheet.cells || []).map(row => row.map(value => String(value ?? '')))
+    })) : undefined;
+    state.docs.sheets = workbookModel.normalizeWorkbook({
+      title: data.title || 'Imported spreadsheet', cells, worksheets, activeWorksheetId: data.activeWorksheetId
+    }, defaults.sheets.cells);
+  }
   if(kind==='slides')state.docs.slides={title:data.title||'Imported presentation',slides:data.slides||clone(defaults.slides.slides),current:0};
   if(kind==='notes')state.docs.notes={title:data.title||'Imported note',text:data.text||''};
   state.app=kind; state.ribbonTab='home';
 }
 function escapeHtml(value){return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 async function openFile(){try{const data=await window.brightdesk.openFile();if(!data)return;importProject(data);persist();render();setStatus('File opened');}catch(error){alert(`Could not open file: ${error.message}`);}}
-async function saveProject(){try{const result=await window.brightdesk.saveProject({title:$('doc-title').value,docs:state.docs});if(!result?.canceled)setStatus('Project saved');}catch(error){alert(`Could not save project: ${error.message}`);}}
+async function saveProject(){try{persist();const result=await window.brightdesk.saveProject({title:$('doc-title').value,docs:state.docs});if(!result?.canceled)setStatus('Project saved');}catch(error){alert(`Could not save project: ${error.message}`);}}
 function setApp(app){if((launchAppId && app !== launchAppId) || !(configs[app] || genericConfigs[app]) || !installedApp(app))return;state.app=app;state.view='workspace';state.ribbonTab='home';render();persist();}
 
 document.querySelectorAll('.nav[data-app]').forEach(btn=>btn.addEventListener('click',()=>setApp(btn.dataset.app)));
