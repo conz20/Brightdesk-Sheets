@@ -170,7 +170,13 @@
 
     function getRange(reference) {
       const parsed = parseRange(reference);
-      if (!parsed) return [getRef(reference)];
+      if (!parsed) {
+        const value = getRef(reference);
+        if (typeof value === 'string' && value.startsWith('#')) {
+          throw new Error('Referenced cell contains an error');
+        }
+        return [value];
+      }
       const target = resolveWorksheet(parsed.sheetName);
       const values = [];
       for (let r = parsed.firstRow; r <= parsed.lastRow; r++) {
