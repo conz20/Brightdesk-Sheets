@@ -46,3 +46,18 @@ test('Fill helpers load before the Sheets renderer', () => {
   const renderer = html.indexOf('src="app.js"');
   assert.ok(fill >= 0 && renderer > fill, 'sheet-fill.js must load before app.js');
 });
+
+test('Add Row and Add Column use guarded worksheet helpers before recording history', () => {
+  const app = read('src/app.js');
+  const rowStart = app.indexOf('function addSheetRow()');
+  const rowEnd = app.indexOf('\nfunction addSheetColumn()', rowStart);
+  const columnStart = rowEnd + 1;
+  const columnEnd = app.indexOf('\nfunction insertColumnFormula', columnStart);
+  assert.ok(rowStart >= 0 && rowEnd > rowStart && columnEnd > columnStart);
+  const rowHandler = app.slice(rowStart, rowEnd);
+  const columnHandler = app.slice(columnStart, columnEnd);
+  assert.match(rowHandler, /appendSheetRow/);
+  assert.match(rowHandler, /recordSheetHistory/);
+  assert.match(columnHandler, /appendSheetColumn/);
+  assert.match(columnHandler, /recordSheetHistory/);
+});
