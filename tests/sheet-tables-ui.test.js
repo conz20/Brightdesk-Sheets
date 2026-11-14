@@ -66,3 +66,16 @@ test('converting a structured table to a range removes metadata but retains cell
   assert.ok(!handler.includes('doc.cells ='));
   assert.ok(!handler.includes('doc.styles ='));
 });
+
+
+test('editing a table header updates the table column definition before saving', () => {
+  const app = read('src/app.js');
+  const start = app.indexOf('function setCell(');
+  const end = app.indexOf('function renameWorksheetFromPrompt', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = app.slice(start, end);
+  assert.ok(handler.includes("state.app === 'sheets'"));
+  assert.ok(handler.includes('sheetTables.updateWorkbookTableHeader('));
+  assert.ok(handler.includes('recordSheetHistory()'));
+  assert.ok(handler.includes('persist()'));
+});
