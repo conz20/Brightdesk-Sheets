@@ -57,6 +57,44 @@ function cloneAutoFilterState(value) {
   return { enabled: source.enabled === true, filters };
 }
 
+function cloneTables(value) {
+  if (!Array.isArray(value)) return [];
+  const result = [];
+  const ids = new Set();
+  const names = new Set();
+  for (const raw of value.slice(0, 1000)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw) ||
+        typeof raw.id !== 'string' || !raw.id.trim() ||
+        typeof raw.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_.]*$/.test(raw.name) ||
+        !raw.range || !Number.isInteger(raw.range.top) || !Number.isInteger(raw.range.left) ||
+        !Number.isInteger(raw.range.bottom) || !Number.isInteger(raw.range.right) ||
+        raw.range.top < 0 || raw.range.left < 0 || raw.range.bottom < raw.range.top ||
+        raw.range.right < raw.range.left ||
+        !Array.isArray(raw.columns) ||
+        raw.columns.length !== raw.range.right - raw.range.left + 1 ||
+        raw.columns.some(name => typeof name !== 'string' || !name.trim())) continue;
+    const nameKey = raw.name.toLocaleLowerCase();
+    if (ids.has(raw.id) || names.has(nameKey)) continue;
+    ids.add(raw.id);
+    names.add(nameKey);
+    result.push({
+      id: raw.id,
+      name: raw.name,
+      range: {
+        top: raw.range.top,
+        left: raw.range.left,
+        bottom: raw.range.bottom,
+        right: raw.range.right
+      },
+      columns: raw.columns.slice(),
+      headerRow: raw.headerRow !== false,
+      totalsRow: raw.totalsRow === true,
+      style: 'brightdesk-green'
+    });
+  }
+  return result;
+}
+
 function makeUniqueName(candidate, usedNames) {
   const base = String(candidate || '').trim().slice(0, 31) || 'Sheet';
   if (!usedNames.has(base.toLocaleLowerCase())) return base;
@@ -95,7 +133,8 @@ function normalizeWorkbook(document, fallbackCells = createEmptyGrid()) {
       name,
       cells: cloneGrid(sheet?.cells, fallbackCells),
       styles: cloneCellStyles(sheet?.styles ?? (index === activeStyleIndex ? source.styles : null)),
-      autoFilter: cloneAutoFilterState(sheet?.autoFilter ?? (index === activeStyleIndex ? source.autoFilter : null))
+      autoFilter: cloneAutoFilterState(sheet?.autoFilter ?? (index === activeStyleIndex ? source.autoFilter : null)),
+      tables: cloneTables(sheet?.tables ?? (index === activeStyleIndex ? source.tables : null))
     };
   });
 
@@ -105,6 +144,7 @@ function normalizeWorkbook(document, fallbackCells = createEmptyGrid()) {
   normalized.cells = cloneGrid(active.cells, fallbackCells);
   normalized.styles = cloneCellStyles(active.styles);
   normalized.autoFilter = cloneAutoFilterState(active.autoFilter);
+  normalized.tables = cloneTables(active.tables);
   return normalized;
 }
 
@@ -117,6 +157,7 @@ function syncActiveWorksheet(document) {
   active.cells = cloneGrid(document.cells);
   active.styles = cloneCellStyles(document.styles);
   active.autoFilter = cloneAutoFilterState(document.autoFilter);
+  active.tables = cloneTables(document.tables);
   return document;
 }
 
@@ -128,6 +169,7 @@ function activateWorksheet(document, worksheetId) {
   document.cells = cloneGrid(target.cells);
   document.styles = cloneCellStyles(target.styles);
   document.autoFilter = cloneAutoFilterState(target.autoFilter);
+  document.tables = cloneTables(target.tables);
   return document;
 }
 
@@ -139,12 +181,13 @@ function addWorksheet(document, requestedName) {
   const name = makeUniqueName(suggested, usedNames);
   let number = 1;
   while (usedIds.has(`sheet-${number}`)) number += 1;
-  const worksheet = { id: `sheet-${number}`, name, cells: createEmptyGrid(), styles: {}, autoFilter: cloneAutoFilterState(null) };
+  const worksheet = { id: `sheet-${number}`, name, cells: createEmptyGrid(), styles: {}, autoFilter: cloneAutoFilterState(null), tables: [] };
   document.worksheets.push(worksheet);
   document.activeWorksheetId = worksheet.id;
   document.cells = cloneGrid(worksheet.cells);
   document.styles = {};
   document.autoFilter = cloneAutoFilterState(null);
+  document.tables = [];
   return document;
 }
 
@@ -175,6 +218,7 @@ function deleteWorksheet(document, worksheetId) {
     document.cells = cloneGrid(next.cells);
     document.styles = cloneCellStyles(next.styles);
     document.autoFilter = cloneAutoFilterState(next.autoFilter);
+    document.tables = cloneTables(next.tables);
   }
   return document;
 }
@@ -196,6 +240,7 @@ return {
   createEmptyGrid,
   cloneCellStyles,
   cloneAutoFilterState,
+  cloneTables,
   normalizeWorkbook,
   syncActiveWorksheet,
   activateWorksheet,
