@@ -10,7 +10,7 @@
   }
 
   function arithmetic(expression) {
-    const tokens = expression.match(/\\d+(?:\\.\\d+)?|[()+\\-*/%]/g) || [];
+    const tokens = expression.match(/\d+(?:\.\d+)?|[()+\-*/%]/g) || [];
     let at = 0;
     function factor() {
       const token = tokens[at++];
@@ -166,7 +166,7 @@
 
     try {
       const formula = raw.slice(1).trim();
-      const fn = formula.match(/^(SUM|AVERAGE|MIN|MAX|COUNT|COUNTA)\\((.*)\\)$/i);
+      const fn = formula.match(/^(SUM|AVERAGE|MIN|MAX|COUNT|COUNTA)\((.*)\)$/i);
       let result;
       if (fn) {
         const values = splitArguments(fn[2]).flatMap(getRange);
@@ -183,13 +183,13 @@
           case 'COUNTA': result = values.filter(value => value !== '' && value !== null && value !== undefined).length; break;
         }
       } else {
-        const referencePattern = /(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]+[1-9]\\d*)|([A-Z]+[1-9]\\d*)/gi;
+        const referencePattern = /(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]+[1-9]\d*)|([A-Z]+[1-9]\d*)/gi;
         const expression = formula.replace(referencePattern, (match, quotedSheet, plainSheet, crossSheetAddress, localAddress) => {
           const value = getRef(crossSheetAddress || localAddress, quotedSheet ? quotedSheet.replace(/''/g, "'") : (plainSheet || null));
           if (typeof value !== 'number') throw new Error('Cell is not numeric');
           return String(value);
         });
-        if (!/^[\\d\\s.+\\-*/()%]+$/.test(expression)) throw new Error('Unsupported expression');
+        if (!/^[\d\s.+\-*/()%]+$/.test(expression)) throw new Error('Unsupported expression');
         result = arithmetic(expression);
       }
       return Number.isFinite(result) ? Number(result.toFixed(8)) : '#VALUE!';
