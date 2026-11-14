@@ -243,6 +243,7 @@ test('XLSX import and export preserve all worksheet names and values', async () 
     assert.deepEqual(imported.worksheets.map(sheet => sheet.name), ['Sales', 'Costs']);
     assert.deepEqual(imported.worksheets[0].cells, payload.worksheets[0].cells);
     assert.deepEqual(imported.worksheets[1].cells, payload.worksheets[1].cells);
-    assert.equal(imported.activeWorksheetId, 'sheet-1');
+    assert.equal(imported.activeWorksheetId, 'sheet-2');
+    assert.deepEqual(imported.cells, payload.worksheets[1].cells);
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
