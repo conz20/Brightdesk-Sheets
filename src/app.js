@@ -262,7 +262,8 @@ function pasteIntoSelectedSheetCell(event) {
   const text = event.clipboardData.getData('text/plain');
   try {
     const clipboardGrid = sheetClipboard.parseClipboardGrid(text);
-    const { row, col } = state.selectedCell;
+    const range = currentSheetRange();
+    const row = range.top, col = range.left;
     const nextCells = sheetClipboard.pasteClipboardGrid(activeDoc().cells, row, col, clipboardGrid);
     const activeId = activeDoc().activeWorksheetId;
     const otherCellCount = activeDoc().worksheets
