@@ -579,6 +579,7 @@ function toExcelCellValue(value) {
   const significantDigits = trimmed.replace(/[^0-9]/g, '').replace(/^0+/, '').length;
   if (significantDigits > 15) return value;
 
+  if (!/^[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?$/.test(trimmed)) return value;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : value;
 }
