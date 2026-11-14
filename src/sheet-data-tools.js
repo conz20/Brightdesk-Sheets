@@ -9,8 +9,8 @@
   const MAX_FILTER_VALUES = 250_000;
   const MAX_CELL_TEXT = 32_767;
   const MAX_ROWS = 1_048_576;
-  const cellAddressPattern = /^([A-Z]{1,3})([1-9]\\d*)$/i;
-  const formulaReferencePattern = /(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]{1,3})([1-9]\\d*)|([A-Z]{1,3})([1-9]\\d*)/gi;
+  const cellAddressPattern = /^([A-Z]{1,3})([1-9]\d*)$/i;
+  const formulaReferencePattern = /(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]{1,3})([1-9]\d*)|([A-Z]{1,3})([1-9]\d*)/gi;
 
   function createAutoFilterState() {
     return { enabled: false, filters: {} };
@@ -22,7 +22,7 @@
     let totalValues = 0;
     if (source.filters && typeof source.filters === 'object' && !Array.isArray(source.filters)) {
       for (const [rawColumn, rawValues] of Object.entries(source.filters)) {
-        if (!/^(?:0|[1-9]\\d*)$/.test(rawColumn)) continue;
+        if (!/^(?:0|[1-9]\d*)$/.test(rawColumn)) continue;
         const column = Number(rawColumn);
         if (!Number.isSafeInteger(column) || column >= MAX_COLUMNS || !Array.isArray(rawValues)) continue;
         const values = [];
