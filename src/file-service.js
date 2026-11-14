@@ -374,8 +374,12 @@ async function openOfficeFile(filePath) {
       assertSheetCellLimit(rows);
       workbookCellCount += rows.reduce((count, row) => count + row.length, 0);
       if (workbookCellCount > MAX_SHEET_CELLS) throw new Error('The imported spreadsheet exceeds the 250,000-cell limit.');
-      const importedWorksheet = { id: `sheet-${index + 1}`, name, cells: rows, styles };
-      if (hasExcelAutoFilterRange(sheet.autoFilter)) importedWorksheet.autoFilter = { enabled: true, filters: {} };
+      const importedWorksheet = {
+        id: `sheet-${index + 1}`, name, cells: rows, styles,
+        autoFilter: hasExcelAutoFilterRange(sheet.autoFilter)
+          ? { enabled: true, filters: {} }
+          : { enabled: false, filters: {} }
+      };
       worksheets.push(importedWorksheet);
     });
     if (!worksheets.length) return { kind: 'sheets', title: path.basename(filePath, ext), cells: [[]] };
