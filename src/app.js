@@ -44,9 +44,12 @@ const pageLayout = window.BrightdeskPageLayout;
 const commonJsonStorage = window.BrightdeskCommonLibs;
 const workbookModel = window.BrightdeskWorkbookModel;
 const sheetNavigation = window.BrightdeskSheetNavigation;
+const sheetHistory = window.BrightdeskSheetHistory;
 if (!commonJsonStorage) throw new Error('Brightdesk common storage helper was not loaded.');
 if (!workbookModel) throw new Error('Brightdesk worksheet model was not loaded.');
 if (!sheetNavigation) throw new Error('Brightdesk sheet navigation helpers were not loaded.');
+if (!sheetHistory) throw new Error('Brightdesk sheet history helpers were not loaded.');
+const workbookHistory = sheetHistory.createHistory({ limit: 100, clone });
 
 function clone(value) { return commonJsonStorage.cloneJsonValue(value); }
 function activeDoc() { return state.docs[state.app]; }
@@ -54,6 +57,23 @@ function setStatus(message) {
   $('save-status').textContent = message;
   const sheetMessage = $('sheet-status-message');
   if (sheetMessage) sheetMessage.textContent = message;
+}
+function recordSheetHistory() {
+  if (state.app === 'sheets') sheetHistory.capture(workbookHistory, activeDoc());
+}
+function applySheetHistory(direction) {
+  if (state.app !== 'sheets') return;
+  const current = clone(activeDoc());
+  const restored = direction === 'undo'
+    ? sheetHistory.undo(workbookHistory, current)
+    : sheetHistory.redo(workbookHistory, current);
+  if (!restored) { setStatus(direction === 'undo' ? 'Nothing to undo' : 'Nothing to redo'); return; }
+  state.docs.sheets = workbookModel.normalizeWorkbook(restored, defaults.sheets.cells);
+  state.selectedCell = { row: 0, col: 0 };
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus(direction === 'undo' ? 'Change undone' : 'Change redone');
 }
 function persist() {
   try {
@@ -236,6 +256,9 @@ function renderToolbar() {
   } else if (app === 'sheets') {
     if (tab === 'home') {
       const grid = group('cells'); addButton(grid, `+ ${label('row')}`, () => addSheetRow()); addButton(grid, `+ ${label('column')}`, () => addSheetColumn());
+      const editing = group('editing');
+      addButton(editing, 'Undo', () => applySheetHistory('undo'), 'Undo the last spreadsheet change');
+      addButton(editing, 'Redo', () => applySheetHistory('redo'), 'Redo the last undone spreadsheet change');
     } else if (tab === 'insert') {
       const insert = group('tools'); addButton(insert, label('newRow'), addSheetRow); addButton(insert, label('newColumn'), addSheetColumn);
     } else if (tab === 'formulas') {
@@ -286,14 +309,15 @@ function renderToolbar() {
     addButton(dictionaryTools, 'Check spelling', checkCurrentDocumentSpelling, 'Check this document with the selected open-source dictionary');
   }
 }
-function addSheetRow() { const cells = activeDoc().cells; cells.push(Array(cells[0]?.length || 12).fill('')); renderSheet(); persist(); }
-function addSheetColumn() { activeDoc().cells.forEach(row => row.push('')); renderSheet(); persist(); }
+function addSheetRow() { recordSheetHistory(); const cells = activeDoc().cells; cells.push(Array(cells[0]?.length || 12).fill('')); renderSheet(); persist(); }
+function addSheetColumn() { recordSheetHistory(); activeDoc().cells.forEach(row => row.push('')); renderSheet(); persist(); }
 function insertColumnFormula(name) {
   const { row, col } = state.selectedCell; const column = letter(col);
   const start = row > 0 ? 1 : 2; const end = row > 0 ? row : Math.max(6, row + 6);
   const value = `=${name}(${column}${start}:${column}${end})`; setCell(row, col, value); renderSheet();
 }
 function sortSheetColumn(descending) {
+  recordSheetHistory();
   const col = state.selectedCell.col;
   activeDoc().cells.sort((a, b) => {
     const av = String(a[col] ?? '').toLocaleLowerCase(), bv = String(b[col] ?? '').toLocaleLowerCase();
@@ -316,13 +340,23 @@ function applySheetZoom() { sheetWrap.style.zoom = `${state.sheetZoom}%`; setSta
 function insertNoteText(value) { const input = $('notes-editor'); const start = input.selectionStart, end = input.selectionEnd; input.setRangeText(value, start, end, 'end'); activeDoc().text = input.value; persist(); input.focus(); }
 function addSlideWithContent(title, body) { activeDoc().slides.push({ title, body }); activeDoc().current = activeDoc().slides.length - 1; renderSlides(); renderToolbar(); persist(); }
 function setSlideTheme(theme) { state.slideTheme = theme; renderSlides(); setStatus(`${theme[0].toUpperCase()}${theme.slice(1)} theme selected`); }
-function setCell(row,col,value) { while (activeDoc().cells.length <= row) activeDoc().cells.push([]); while (activeDoc().cells[row].length <= col) activeDoc().cells[row].push(''); activeDoc().cells[row][col]=value; persist(); }
+function setCell(row,col,value) {
+  const cells = activeDoc().cells;
+  const current = String(cells?.[row]?.[col] ?? '');
+  if (current === String(value ?? '')) return;
+  recordSheetHistory();
+  while (activeDoc().cells.length <= row) activeDoc().cells.push([]);
+  while (activeDoc().cells[row].length <= col) activeDoc().cells[row].push('');
+  activeDoc().cells[row][col] = String(value ?? '');
+  persist();
+}
 function renameWorksheetFromPrompt(worksheetId) {
   const worksheet = activeDoc().worksheets.find(sheet => sheet.id === worksheetId);
   if (!worksheet) return;
   const requestedName = window.prompt('Worksheet name', worksheet.name);
   if (requestedName === null) return;
   try {
+    recordSheetHistory();
     workbookModel.renameWorksheet(activeDoc(), worksheetId, requestedName);
     renderSheetTabs();
     persist();
@@ -333,6 +367,7 @@ function deleteWorksheetWithConfirmation(worksheetId) {
   if (!worksheet) return;
   if (!window.confirm(`Delete the worksheet “${worksheet.name}”? This cannot be undone.`)) return;
   try {
+    recordSheetHistory();
     workbookModel.deleteWorksheet(activeDoc(), worksheetId);
     state.selectedCell = { row: 0, col: 0 };
     renderSheet();
@@ -387,6 +422,7 @@ function renderSheetTabs() {
       if (!movedId || movedId === worksheet.id) return;
       const from = doc.worksheets.findIndex(item => item.id === movedId);
       if (from < 0) return;
+      recordSheetHistory();
       workbookModel.moveWorksheet(doc, movedId, index);
       renderSheetTabs();
       persist();
@@ -399,6 +435,7 @@ function renderSheetTabs() {
   add.type = 'button'; add.className = 'sheet-tab-action'; add.textContent = '+ Sheet';
   add.setAttribute('aria-label', 'Add worksheet'); add.title = 'Add worksheet';
   add.addEventListener('click', () => {
+    recordSheetHistory();
     workbookModel.addWorksheet(doc);
     state.selectedCell = { row: 0, col: 0 };
     renderSheet(); renderToolbar(); persist();
@@ -424,6 +461,11 @@ function refreshSheetValues() {
 function navigateSheetCell(input, event) {
   const row = Number(input.dataset.row);
   const col = Number(input.dataset.col);
+  if ((event.ctrlKey || event.metaKey) && ['z', 'y'].includes(event.key.toLowerCase())) {
+    event.preventDefault();
+    applySheetHistory(event.key.toLowerCase() === 'z' && !event.shiftKey ? 'undo' : 'redo');
+    return true;
+  }
   const target = sheetNavigation.getKeyboardNavigationTarget({
     row,
     col,
