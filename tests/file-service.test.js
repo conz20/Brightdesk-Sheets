@@ -526,7 +526,6 @@ test('created worksheet tables retain Brightdesk cell styling through XLSX and p
     }, 'SalesTable');
     assert.equal(created.name, 'SalesTable');
 
-    const sheet = workbook.worksheets[0];
     const project = {
       title: 'Sales',
       docs: {
