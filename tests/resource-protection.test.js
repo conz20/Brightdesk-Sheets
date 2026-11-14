@@ -56,35 +56,7 @@ test('Windows installer displays the Brightdesk licence and offers a normal setu
   assert.equal(pkg.build.nsis.createStartMenuShortcut, true);
 });
 
-test('release workflow has working install and release permissions', () => {
-  const suiteWorkflowPath = path.join(root, '.github', 'workflows', 'build-release.yml');
-  if (fs.existsSync(suiteWorkflowPath)) {
-    const workflow = fs.readFileSync(suiteWorkflowPath, 'utf8');
-    assert.match(workflow, /node-version: 24\.22\.2/);
-    assert.match(workflow, /run: npm ci/);
-    assert.match(workflow, /npm run verify:licenses/);
-    assert.match(workflow, /npm run release:preflight/);
-    const buildHelper = fs.readFileSync(path.join(root, 'scripts', 'build-in-docker.sh'), 'utf8');
-    assert.match(buildHelper, /npm run release:verify:win/);
-    assert.match(buildHelper, /npm run release:verify:linux/);
-    assert.match(workflow, /npm run release:verify:mac/);
-    assert.match(workflow, /WIN_CSC_LINK/);
-    assert.match(workflow, /MAC_INSTALLER_CSC_LINK/);
-    assert.match(workflow, /APPLE_APP_SPECIFIC_PASSWORD/);
-    for (const command of ['npm run dist:products:linux', 'npm run dist:products:win']) {
-      assert.ok(buildHelper.includes(command), `Docker helper includes ${command}`);
-    }
-    assert.ok(workflow.includes('npm run dist:products:mac'));
-    for (const command of ['npm run release:verify:products:linux', 'npm run release:verify:products:win']) {
-      assert.ok(buildHelper.includes(command), `Docker helper includes ${command}`);
-    }
-    assert.ok(workflow.includes('npm run release:verify:products:mac'));
-    assert.match(workflow, /Brightdesk-Builds/);
-    assert.doesNotMatch(workflow, /actions\/(?:upload|download)-artifact/);
-    assert.doesNotMatch(workflow, /contents: write/);
-    return;
-  }
-
+test('release workflow uses supported branch and tag event filters with direct draft-release assets', () => {
   const workflow = read('.github/workflows/product-installers.yml');
   assert.match(workflow, /node-version: 24\.22\.2/);
   assert.match(workflow, /npm ci --no-audit --no-fund/);
@@ -93,18 +65,32 @@ test('release workflow has working install and release permissions', () => {
   assert.match(workflow, /npm run dist:product:\$\{\{ matrix\.platform \}\}/);
   assert.match(workflow, /npm run verify:product:\$\{\{ matrix\.platform \}\}/);
   assert.doesNotMatch(workflow, /workflow_dispatch:/, 'installer builds must not depend on manual dispatch');
-  assert.match(workflow, /tags: \['v\*'\]/, 'version tags are the explicit release trigger');
-  assert.doesNotMatch(workflow, /windows-latest|macos-latest|ubuntu-latest/, 'platform builds must use private self-hosted runners');
+  const pushStart = workflow.indexOf('\n  push:\n');
+  const scheduleStart = workflow.indexOf('\n  schedule:\n', pushStart);
+  const permissionsStart = workflow.indexOf('\npermissions:\n', pushStart);
+  const pushEnd = scheduleStart >= 0 ? scheduleStart : permissionsStart;
+  assert.ok(pushStart >= 0 && pushEnd > pushStart, 'push trigger exists');
+  const pushTrigger = workflow.slice(pushStart, pushEnd);
+  assert.doesNotMatch(pushTrigger, /branches:|tags:/, 'push must not combine branches and tags filters');
+  assert.match(workflow, /refs\/heads\/main/);
+  assert.match(workflow, /startsWith\(github\.ref, 'refs\/tags\/v'\)/);
   assert.match(workflow, /runner: \["self-hosted", "Windows", "X64"\]/);
   assert.match(workflow, /runner: \["self-hosted", "macOS", "ARM64"\]/);
   assert.match(workflow, /runner: \["self-hosted", "Linux", "X64"\]/);
+  assert.doesNotMatch(workflow, /windows-latest|macos-latest|ubuntu-latest/, 'platform builds must use private self-hosted runners');
+
+  const prepare = workflow.slice(workflow.indexOf('  prepare-release:'), workflow.indexOf('  release-assets:'));
+  const releaseAssets = workflow.slice(workflow.indexOf('  release-assets:'), workflow.indexOf('  publish-release:'));
   const publish = workflow.slice(workflow.indexOf('  publish-release:'));
-  assert.match(publish, /if: github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/v'\)/);
-  assert.match(publish, /tag_name: \$\{\{ github\.ref_name \}\}/);
-  assert.match(publish, /contents: write/);
-  assert.match(publish, /needs: release-assets/);
-  assert.match(workflow, /prepare-release:[\\s\\S]*?draft: true/);
-  assert.match(workflow, /release-assets:[\\s\\S]*?fail_on_unmatched_files: true/);
-  assert.match(workflow, /draft: false/);
-  assert.doesNotMatch(workflow, /actions\\/(?:upload|download)-artifact/, 'release assets must not use Actions artifact storage');
+  assert.ok(prepare.includes('EXPECTED_TAG="v$VERSION"'), 'release tag must match package.json version');
+  assert.ok(prepare.includes('GITHUB_REF_NAME'), 'version tag is checked before creating a draft release');
+  assert.ok(prepare.includes('draft: true'), 'release begins unpublished');
+  assert.match(releaseAssets, /release\/apps\/[a-z-]+\/\*\*/);
+  assert.ok(releaseAssets.includes('fail_on_unmatched_files: true'));
+  assert.ok(releaseAssets.includes('draft: true'));
+  assert.ok(publish.includes('needs: release-assets'));
+  assert.ok(publish.includes('draft: false'));
+  assert.ok(publish.includes('contents: write'));
+  assert.doesNotMatch(workflow, /actions\/(?:upload|download)-artifact/, 'release files must not use Actions artifact storage');
+  assert.ok(workflow.includes('softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4'));
 });
