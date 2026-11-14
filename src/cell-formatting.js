@@ -118,5 +118,33 @@
     return next;
   }
 
-  return { DEFAULT_STYLE, normalizeCellStyle, formatCellDisplay, updateCellStyle, removeCellStyle, updateCellStylesInRange, removeCellStylesInRange };
+  function fillCellStylesDown(styles, range) {
+    const selected = normalizeStyleRange(range);
+    const next = { ...(styles && typeof styles === 'object' && !Array.isArray(styles) ? styles : {}) };
+    for (let row = selected.top + 1; row <= selected.bottom; row += 1) {
+      for (let col = selected.left; col <= selected.right; col += 1) {
+        const sourceAddress = columnLabel(col) + (selected.top + 1);
+        const targetAddress = columnLabel(col) + (row + 1);
+        if (next[sourceAddress]) next[targetAddress] = normalizeCellStyle(next[sourceAddress]);
+        else delete next[targetAddress];
+      }
+    }
+    return next;
+  }
+
+  function fillCellStylesRight(styles, range) {
+    const selected = normalizeStyleRange(range);
+    const next = { ...(styles && typeof styles === 'object' && !Array.isArray(styles) ? styles : {}) };
+    for (let row = selected.top; row <= selected.bottom; row += 1) {
+      for (let col = selected.left + 1; col <= selected.right; col += 1) {
+        const sourceAddress = columnLabel(selected.left) + (row + 1);
+        const targetAddress = columnLabel(col) + (row + 1);
+        if (next[sourceAddress]) next[targetAddress] = normalizeCellStyle(next[sourceAddress]);
+        else delete next[targetAddress];
+      }
+    }
+    return next;
+  }
+
+  return { DEFAULT_STYLE, normalizeCellStyle, formatCellDisplay, updateCellStyle, removeCellStyle, updateCellStylesInRange, removeCellStylesInRange, fillCellStylesDown, fillCellStylesRight };
 });
