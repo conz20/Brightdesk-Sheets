@@ -149,6 +149,74 @@
     return indexes;
   }
 
+  function columnIndexFromLabel(label) {
+    let value = 0;
+    for (const character of String(label).toUpperCase()) {
+      value = value * 26 + character.charCodeAt(0) - 64;
+    }
+    return value - 1;
+  }
+
+  function columnLabelFromIndex(index) {
+    let value = index + 1;
+    let label = '';
+    while (value > 0) {
+      const remainder = (value - 1) % 26;
+      label = String.fromCharCode(65 + remainder) + label;
+      value = Math.floor((value - 1) / 26);
+    }
+    return label;
+  }
+
+  function translateRangeReference(firstColumn, firstRowNumber, lastColumn, lastRowNumber, destinationBySourceRow, headerRow, prefix) {
+    const firstRow = Number(firstRowNumber) - 1;
+    const lastRow = Number(lastRowNumber) - 1;
+    const rowStep = firstRow <= lastRow ? 1 : -1;
+    const targetRows = [];
+
+    for (let sourceRow = firstRow; rowStep > 0 ? sourceRow <= lastRow : sourceRow >= lastRow; sourceRow += rowStep) {
+      const targetRow = sourceRow > headerRow ? destinationBySourceRow.get(sourceRow) : undefined;
+      targetRows.push(targetRow === undefined ? sourceRow : targetRow);
+    }
+
+    const uniqueRows = new Set(targetRows);
+    const minimumRow = targetRows.reduce((minimum, row) => Math.min(minimum, row), Infinity);
+    const maximumRow = targetRows.reduce((maximum, row) => Math.max(maximum, row), -Infinity);
+    const contiguous = uniqueRows.size === targetRows.length && maximumRow - minimumRow + 1 === targetRows.length;
+
+    if (contiguous) {
+      return prefix + firstColumn + (targetRows[0] + 1) + ':' + lastColumn + (targetRows[targetRows.length - 1] + 1);
+    }
+
+    const segments = [];
+    let segmentStart = targetRows[0];
+    let previousRow = targetRows[0];
+    let direction = 0;
+    for (let index = 1; index < targetRows.length; index += 1) {
+      const currentRow = targetRows[index];
+      const difference = currentRow - previousRow;
+      if (Math.abs(difference) === 1 && (!direction || direction === difference)) {
+        direction = difference;
+        previousRow = currentRow;
+        continue;
+      }
+      segments.push([segmentStart, previousRow]);
+      segmentStart = currentRow;
+      previousRow = currentRow;
+      direction = 0;
+    }
+    segments.push([segmentStart, previousRow]);
+
+    return segments.map(([startRow, endRow]) => {
+      const firstAddress = firstColumn + (startRow + 1);
+      const lastAddress = lastColumn + (endRow + 1);
+      const range = startRow === endRow && firstColumn === lastColumn
+        ? firstAddress
+        : firstAddress + ':' + lastAddress;
+      return prefix + range;
+    }).join(',');
+  }
+
   function translateFormulaRow(value, destinationBySourceRow, worksheetName, headerRow = 0, includeUnqualified = true) {
     const formula = String(value ?? '');
     if (!formula.startsWith('=') || !(destinationBySourceRow instanceof Map)) return formula;
@@ -159,28 +227,28 @@
             (explicitSheet && (!worksheetName || explicitSheet.toLocaleLowerCase() !== String(worksheetName).toLocaleLowerCase()))) {
           return match;
         }
+        const prefix = quotedSheet !== undefined
+          ? "'" + quotedSheet + "'!"
+          : (plainSheet ? plainSheet + '!' : '');
         const firstColumn = crossColumn || localColumn;
-        const firstRow = Number(crossRow || localRow) - 1;
-        const targetFirstRow = firstRow > headerRow ? destinationBySourceRow.get(firstRow) : undefined;
-        const firstAddress = firstColumn + (targetFirstRow === undefined ? firstRow + 1 : targetFirstRow + 1);
+        const firstRowNumber = crossRow || localRow;
         const lastColumn = crossLastColumn || localLastColumn;
         const lastRowNumber = crossLastRow || localLastRow;
-        let address = firstAddress;
         if (lastColumn && lastRowNumber) {
-          const lastRow = Number(lastRowNumber) - 1;
-          const targetLastRow = lastRow > headerRow ? destinationBySourceRow.get(lastRow) : undefined;
-          address += ':' + lastColumn + (targetLastRow === undefined ? lastRow + 1 : targetLastRow + 1);
+          return translateRangeReference(
+            firstColumn, firstRowNumber, lastColumn, lastRowNumber,
+            destinationBySourceRow, headerRow, prefix
+          );
         }
-        if (quotedSheet !== undefined) return "'" + quotedSheet + "'!" + address;
-        if (plainSheet) return plainSheet + '!' + address;
-        return address;
+        const sourceRow = Number(firstRowNumber) - 1;
+        const targetRow = sourceRow > headerRow ? destinationBySourceRow.get(sourceRow) : undefined;
+        return prefix + firstColumn + (targetRow === undefined ? sourceRow + 1 : targetRow + 1);
       });
   }
 
   function translateExternalFormulaRow(value, destinationBySourceRow, worksheetName, headerRow = 0) {
     return translateFormulaRow(value, destinationBySourceRow, worksheetName, headerRow, false);
   }
-
 
   function parseCellAddress(address) {
     const match = String(address).match(cellAddressPattern);
