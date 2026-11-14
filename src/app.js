@@ -36,6 +36,7 @@ const state = {
   selectionAnchor: { row: 0, col: 0 },
   selectedRange: { top: 0, left: 0, bottom: 0, right: 0, rowCount: 1, columnCount: 1, cellCount: 1 },
   pendingMouseSelection: false, extendSelectionOnClick: false,
+  sheetFilterMenuColumn: null, sheetFilterValues: [], sheetPendingFilterValues: new Set(), sheetFilterSearch: '',
   update: null, ribbonTab: 'home',
   installedApps: [], setupComplete: false, firstRunSelection: new Set(installableCatalog.map(item => item.id)),
   slideTheme: 'lavender', focusMode: false, editorZoom: 100, sheetZoom: 100,
@@ -52,6 +53,7 @@ const sheetHistory = window.BrightdeskSheetHistory;
 const cellFormatting = window.BrightdeskCellFormatting;
 const sheetClipboard = window.BrightdeskSheetClipboard;
 const sheetRange = window.BrightdeskSheetRange;
+const sheetDataTools = window.BrightdeskSheetDataTools;
 const sheetFill = window.BrightdeskSheetFill;
 if (!commonJsonStorage) throw new Error('Brightdesk common storage helper was not loaded.');
 if (!workbookModel) throw new Error('Brightdesk worksheet model was not loaded.');
@@ -60,6 +62,7 @@ if (!sheetHistory) throw new Error('Brightdesk sheet history helpers were not lo
 if (!cellFormatting) throw new Error('Brightdesk cell formatting helpers were not loaded.');
 if (!sheetClipboard) throw new Error('Brightdesk sheet clipboard helpers were not loaded.');
 if (!sheetRange) throw new Error('Brightdesk worksheet range helpers were not loaded.');
+if (!sheetDataTools) throw new Error('Brightdesk worksheet filter and sort helpers were not loaded.');
 if (!sheetFill) throw new Error('Brightdesk Fill Down/Right helpers were not loaded.');
 const workbookHistory = sheetHistory.createHistory({ limit: 100, clone });
 
@@ -481,7 +484,13 @@ function renderToolbar() {
       ['SUM','AVERAGE','MIN','MAX','COUNT'].forEach(name => addButton(fn, name, () => insertColumnFormula(name), `Insert ${name} formula for the selected column`));
     } else if (tab === 'data') {
       const data = group('sort');
-      addButton(data, label('sortAZ'), () => sortSheetColumn(false)); addButton(data, label('sortZA'), () => sortSheetColumn(true));
+      addButton(data, label('sortAZ'), () => sortSheetColumn(false));
+      addButton(data, label('sortZA'), () => sortSheetColumn(true));
+      const filterButton = addButton(data, 'Filter', toggleSheetAutoFilter, 'Turn worksheet filters on or off');
+      filterButton.setAttribute('aria-pressed', String(activeDoc().autoFilter?.enabled === true));
+      filterButton.classList.toggle('active', activeDoc().autoFilter?.enabled === true);
+      const clearFilters = addButton(data, 'Clear all filters', clearAllSheetFilters, 'Show all rows on this worksheet');
+      clearFilters.disabled = !Object.keys(activeDoc().autoFilter?.filters || {}).length;
     } else {
       const view = group('zoom');
       addButton(view, label('zoomOut'), () => changeSheetZoom(-10)); addButton(view, `${state.sheetZoom}%`, () => { state.sheetZoom = 100; applySheetZoom(); }); addButton(view, label('zoomIn'), () => changeSheetZoom(10));
@@ -575,15 +584,235 @@ function insertColumnFormula(name) {
   const start = row > 0 ? 1 : 2; const end = row > 0 ? row : Math.max(6, row + 6);
   const value = `=${name}(${column}${start}:${column}${end})`; setCell(row, col, value); renderSheet();
 }
+function resolveSheetFilterValue({ row, col }) {
+  return cellNumeric(row, col);
+}
+function visibleSheetRowIndexes() {
+  return sheetDataTools.getVisibleRowIndexes(activeDoc().cells || [], activeDoc().autoFilter || sheetDataTools.createAutoFilterState(), {
+    resolveValue: resolveSheetFilterValue
+  });
+}
+function keepSelectedSheetCellVisible() {
+  const visibleRows = visibleSheetRowIndexes();
+  if (visibleRows.includes(state.selectedCell.row)) return false;
+  const nextRow = visibleRows.find(row => row > 0) ?? visibleRows[0] ?? 0;
+  resetSheetSelection(nextRow, state.selectedCell.col);
+  return true;
+}
+function toggleSheetAutoFilter() {
+  const current = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter);
+  recordSheetHistory();
+  activeDoc().autoFilter = sheetDataTools.setAutoFilterEnabled(current, !current.enabled);
+  state.sheetFilterMenuColumn = null;
+  if (current.enabled) state.sheetFilterSearch = '';
+  keepSelectedSheetCellVisible();
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus(activeDoc().autoFilter.enabled ? 'Filters are on for this worksheet' : 'Filters are off for this worksheet');
+}
+function clearAllSheetFilters() {
+  const current = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter);
+  if (!Object.keys(current.filters).length) {
+    setStatus('There are no active column filters to clear');
+    return;
+  }
+  recordSheetHistory();
+  activeDoc().autoFilter = sheetDataTools.clearAllColumnFilters(current);
+  state.sheetFilterMenuColumn = null;
+  state.sheetFilterSearch = '';
+  keepSelectedSheetCellVisible();
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus('All column filters cleared');
+}
+function clearSheetColumnFilter(column) {
+  recordSheetHistory();
+  activeDoc().autoFilter = sheetDataTools.clearColumnFilter(activeDoc().autoFilter, column);
+  state.sheetFilterMenuColumn = null;
+  state.sheetFilterSearch = '';
+  keepSelectedSheetCellVisible();
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus('Filter cleared for column ' + letter(column));
+}
+function applySheetColumnFilter(column) {
+  const values = state.sheetFilterValues;
+  const selected = [...state.sheetPendingFilterValues];
+  const allSelected = selected.length === values.length && values.every(value => state.sheetPendingFilterValues.has(value));
+  recordSheetHistory();
+  activeDoc().autoFilter = allSelected
+    ? sheetDataTools.clearColumnFilter(activeDoc().autoFilter, column)
+    : sheetDataTools.setColumnFilter(activeDoc().autoFilter, column, selected);
+  state.sheetFilterMenuColumn = null;
+  state.sheetFilterSearch = '';
+  keepSelectedSheetCellVisible();
+  persist();
+  renderSheet();
+  renderToolbar();
+  const activeFilters = Object.keys(activeDoc().autoFilter.filters).length;
+  const visibleCount = Math.max(0, visibleSheetRowIndexes().length - 1);
+  const dataCount = Math.max(0, (activeDoc().cells || []).length - 1);
+  setStatus('Showing ' + visibleCount + ' of ' + dataCount + ' data rows · ' + activeFilters + ' column filter' + (activeFilters === 1 ? '' : 's'));
+}
+function openSheetFilterMenu(column) {
+  if (!activeDoc().autoFilter?.enabled) {
+    setStatus('Turn on Filter from the Data tab first');
+    return;
+  }
+  const values = sheetDataTools.getUniqueColumnValues(activeDoc().cells || [], column, {
+    resolveValue: resolveSheetFilterValue
+  });
+  const filters = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter).filters;
+  const hasSelection = Object.prototype.hasOwnProperty.call(filters, String(column));
+  state.sheetFilterMenuColumn = column;
+  state.sheetFilterValues = values;
+  state.sheetPendingFilterValues = new Set(hasSelection ? filters[String(column)] : values);
+  state.sheetFilterSearch = '';
+  renderSheet();
+  const search = sheetWrap.querySelector('.sheet-filter-search');
+  search?.focus({ preventScroll: true });
+}
+function closeSheetFilterMenu() {
+  state.sheetFilterMenuColumn = null;
+  state.sheetFilterSearch = '';
+  renderSheet();
+}
+function renderSheetFilterMenu(cell, column) {
+  if (state.sheetFilterMenuColumn !== column) return;
+  const menu = document.createElement('div');
+  menu.className = 'sheet-filter-menu';
+  menu.setAttribute('role', 'group');
+  menu.setAttribute('aria-label', 'Filter options for column ' + letter(column));
+  menu.addEventListener('click', event => event.stopPropagation());
+  menu.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeSheetFilterMenu();
+    }
+  });
+
+  const heading = document.createElement('div');
+  heading.className = 'sheet-filter-heading';
+  heading.textContent = 'Filter ' + letter(column);
+  const search = document.createElement('input');
+  search.className = 'sheet-filter-search';
+  search.type = 'search';
+  search.placeholder = 'Search values';
+  search.setAttribute('aria-label', 'Search values in column ' + letter(column));
+  search.value = state.sheetFilterSearch;
+  const actions = document.createElement('div');
+  actions.className = 'sheet-filter-selection-actions';
+  const selectAll = document.createElement('button');
+  selectAll.type = 'button';
+  selectAll.className = 'sheet-filter-link';
+  selectAll.textContent = 'Select all';
+  const selectNone = document.createElement('button');
+  selectNone.type = 'button';
+  selectNone.className = 'sheet-filter-link';
+  selectNone.textContent = 'Clear selection';
+  actions.append(selectAll, selectNone);
+
+  const status = document.createElement('div');
+  status.className = 'sheet-filter-count';
+  status.setAttribute('role', 'status');
+  const options = document.createElement('div');
+  options.className = 'sheet-filter-options';
+  const footer = document.createElement('div');
+  footer.className = 'sheet-filter-footer';
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'sheet-filter-menu-button secondary';
+  clear.textContent = 'Clear filter';
+  clear.disabled = !Object.prototype.hasOwnProperty.call(activeDoc().autoFilter?.filters || {}, String(column));
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'sheet-filter-menu-button secondary';
+  cancel.textContent = 'Cancel';
+  const apply = document.createElement('button');
+  apply.type = 'button';
+  apply.className = 'sheet-filter-menu-button primary';
+  apply.textContent = 'Apply';
+  footer.append(clear, cancel, apply);
+
+  function updateStatus(matchCount) {
+    status.textContent = state.sheetPendingFilterValues.size + ' selected · ' + matchCount + ' values';
+  }
+  function renderOptions() {
+    options.replaceChildren();
+    const query = search.value.trim().toLocaleLowerCase();
+    const matches = state.sheetFilterValues.filter(value =>
+      (value === '' ? '(Blanks)' : value).toLocaleLowerCase().includes(query)
+    );
+    matches.slice(0, 200).forEach(value => {
+      const label = document.createElement('label');
+      label.className = 'sheet-filter-option';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = state.sheetPendingFilterValues.has(value);
+      checkbox.setAttribute('aria-label', value === '' ? '(Blanks)' : value);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) state.sheetPendingFilterValues.add(value);
+        else state.sheetPendingFilterValues.delete(value);
+        updateStatus(matches.length);
+      });
+      const optionLabel = document.createElement('span');
+      optionLabel.textContent = value === '' ? '(Blanks)' : value;
+      label.append(checkbox, optionLabel);
+      options.append(label);
+    });
+    if (matches.length > 200) {
+      const limit = document.createElement('div');
+      limit.className = 'sheet-filter-limit';
+      limit.textContent = 'Showing 200 of ' + matches.length + ' matches. Search to narrow the list.';
+      options.append(limit);
+    }
+    if (!matches.length) {
+      const empty = document.createElement('div');
+      empty.className = 'sheet-filter-empty';
+      empty.textContent = 'No matching values';
+      options.append(empty);
+    }
+    updateStatus(matches.length);
+  }
+  search.addEventListener('input', () => {
+    state.sheetFilterSearch = search.value;
+    renderOptions();
+  });
+  selectAll.addEventListener('click', () => {
+    state.sheetPendingFilterValues = new Set(state.sheetFilterValues);
+    renderOptions();
+  });
+  selectNone.addEventListener('click', () => {
+    state.sheetPendingFilterValues = new Set();
+    renderOptions();
+  });
+  clear.addEventListener('click', () => clearSheetColumnFilter(column));
+  cancel.addEventListener('click', closeSheetFilterMenu);
+  apply.addEventListener('click', () => applySheetColumnFilter(column));
+
+  menu.append(heading, search, actions, status, options, footer);
+  cell.append(menu);
+  renderOptions();
+}
 function sortSheetColumn(descending) {
   recordSheetHistory();
-  const col = state.selectedCell.col;
-  activeDoc().cells.sort((a, b) => {
-    const av = String(a[col] ?? '').toLocaleLowerCase(), bv = String(b[col] ?? '').toLocaleLowerCase();
-    const an = Number(av), bn = Number(bv);
-    const result = av !== '' && bv !== '' && Number.isFinite(an) && Number.isFinite(bn) ? an - bn : av.localeCompare(bv);
-    return descending ? -result : result;
-  }); renderSheet(); persist();
+  const doc = activeDoc();
+  const worksheet = doc.worksheets?.find(sheet => sheet.id === doc.activeWorksheetId);
+  const sorted = sheetDataTools.sortWorksheet(doc.cells || [], doc.styles || {}, state.selectedCell.col, {
+    descending,
+    worksheetName: worksheet?.name,
+    resolveValue: resolveSheetFilterValue
+  });
+  doc.cells = sorted.cells;
+  doc.styles = sorted.styles;
+  persist();
+  keepSelectedSheetCellVisible();
+  renderSheet();
+  renderToolbar();
+  setStatus('Sorted column ' + letter(state.selectedCell.col) + (descending ? ' Z to A' : ' A to Z'));
 }
 function applyPageLayout() {
   if (!pageLayout || state.app !== 'pages') return;
@@ -740,6 +969,23 @@ function navigateSheetCell(input, event) {
     selectionEnd: input.selectionEnd
   });
   if (!target) return false;
+  const nextTarget = { ...target };
+  const filterState = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter);
+  if (filterState.enabled && nextTarget.row !== row) {
+    const visibleRows = visibleSheetRowIndexes();
+    if (!visibleRows.includes(nextTarget.row)) {
+      const direction = nextTarget.row > row ? 1 : -1;
+      const candidates = direction > 0
+        ? visibleRows.filter(visibleRow => visibleRow > row)
+        : visibleRows.filter(visibleRow => visibleRow < row).reverse();
+      if (!candidates.length) {
+        event.preventDefault();
+        setStatus('No more visible rows in that direction');
+        return true;
+      }
+      nextTarget.row = candidates[0];
+    }
+  }
 
   event.preventDefault();
   if (input.dataset.edited === 'true') {
@@ -748,13 +994,13 @@ function navigateSheetCell(input, event) {
   }
 
   try {
-    sheetNavigation.ensureCellExists(activeDoc().cells, target.row, target.col);
+    sheetNavigation.ensureCellExists(activeDoc().cells, nextTarget.row, nextTarget.col);
   } catch (error) {
     setStatus(error.message);
     return true;
   }
 
-  resetSheetSelection(target.row, target.col);
+  resetSheetSelection(nextTarget.row, nextTarget.col);
   let next = sheetWrap.querySelector(`input.grid-cell[data-row="${target.row}"][data-col="${target.col}"]`);
   if (!next) {
     renderSheet();
@@ -773,30 +1019,52 @@ function navigateSheetCell(input, event) {
 function renderSheet() {
   const rows = activeDoc().cells || (activeDoc().cells = clone(defaults.sheets.cells));
   const maxCols = rows.reduce((maximum, row) => Math.max(maximum, row.length), 12);
-  const table = document.createElement('table'); table.className='sheet';
-  const thead = document.createElement('thead'), head = document.createElement('tr'); const corner=document.createElement('th'); corner.textContent=''; head.append(corner);
-  for(let c=0;c<maxCols;c++){const th=document.createElement('th');th.textContent=letter(c);head.append(th);} thead.append(head); table.append(thead);
-  const tbody=document.createElement('tbody');
-  rows.forEach((row,r)=>{const tr=document.createElement('tr'),th=document.createElement('th');th.textContent=String(r+1);tr.append(th);
-    for(let c=0;c<maxCols;c++){const td=document.createElement('td'),input=document.createElement('input');input.className='grid-cell';input.value=formattedCellValue(r,c);input.dataset.row=r;input.dataset.col=c;input.setAttribute('aria-label',`${letter(c)}${r+1}`);input.lang=state.proofingLanguage;applyCellVisualStyle(input,r,c);
+  const visibleRowIndexes = visibleSheetRowIndexes();
+  const autoFilter = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter);
+  const table = document.createElement('table'); table.className = 'sheet';
+  const thead = document.createElement('thead'), head = document.createElement('tr');
+  const corner = document.createElement('th'); corner.textContent = ''; head.append(corner);
+  for (let c = 0; c < maxCols; c += 1) {
+    const th = document.createElement('th'); th.textContent = letter(c); head.append(th);
+  }
+  thead.append(head); table.append(thead);
+  const tbody = document.createElement('tbody');
+  visibleRowIndexes.forEach(rowIndex => {
+    const row = rows[rowIndex];
+    const tr = document.createElement('tr');
+    tr.dataset.row = rowIndex;
+    const rowHeader = document.createElement('th');
+    rowHeader.textContent = String(rowIndex + 1);
+    rowHeader.setAttribute('scope', 'row');
+    tr.append(rowHeader);
+    for (let c = 0; c < maxCols; c += 1) {
+      const td = document.createElement('td');
+      const input = document.createElement('input');
+      input.className = 'grid-cell';
+      input.value = formattedCellValue(rowIndex, c);
+      input.dataset.row = rowIndex;
+      input.dataset.col = c;
+      input.setAttribute('aria-label', letter(c) + (rowIndex + 1));
+      input.lang = state.proofingLanguage;
+      applyCellVisualStyle(input, rowIndex, c);
       input.addEventListener('mousedown', event => {
         state.pendingMouseSelection = true;
         state.extendSelectionOnClick = Boolean(event.shiftKey && state.selectionAnchor);
-        if (!state.extendSelectionOnClick) state.selectionAnchor = { row: r, col: c };
+        if (!state.extendSelectionOnClick) state.selectionAnchor = { row: rowIndex, col: c };
       });
       input.addEventListener('focus', () => {
-        state.selectedCell = { row: r, col: c };
+        state.selectedCell = { row: rowIndex, col: c };
         if (!state.pendingMouseSelection) {
-          state.selectionAnchor = { row: r, col: c };
+          state.selectionAnchor = { row: rowIndex, col: c };
           state.selectedRange = sheetRange.rangeFromCells(state.selectionAnchor, state.selectedCell);
         }
-        input.value = cellRaw(r, c);
+        input.value = cellRaw(rowIndex, c);
         applySheetRangeHighlight();
         renderToolbar();
         updateSheetFormulaBar();
       });
       input.addEventListener('click', () => {
-        const focus = { row: r, col: c };
+        const focus = { row: rowIndex, col: c };
         if (!state.extendSelectionOnClick) state.selectionAnchor = focus;
         state.selectedCell = focus;
         state.selectedRange = sheetRange.rangeFromCells(state.selectionAnchor, focus);
@@ -806,17 +1074,56 @@ function renderSheet() {
         renderToolbar();
         updateSheetFormulaBar();
       });
-      input.addEventListener('blur',()=>{if(input.dataset.edited!=='true')input.value=formattedCellValue(r,c);});
-      input.addEventListener('input',()=>{input.dataset.edited='true';});
-      input.addEventListener('change',()=>{if(input.dataset.edited==='true')setCell(r,c,input.value);input.dataset.edited='false';refreshSheetValues();});
-      input.addEventListener('keydown',event=>navigateSheetCell(input,event));
-      td.append(input);tr.append(td);}
+      input.addEventListener('blur', () => {
+        if (input.dataset.edited !== 'true') input.value = formattedCellValue(rowIndex, c);
+      });
+      input.addEventListener('input', () => { input.dataset.edited = 'true'; });
+      input.addEventListener('change', () => {
+        const changed = input.dataset.edited === 'true';
+        if (changed) setCell(rowIndex, c, input.value);
+        input.dataset.edited = 'false';
+        if (changed && autoFilter.enabled) {
+          keepSelectedSheetCellVisible();
+          renderSheet();
+        } else {
+          refreshSheetValues();
+        }
+      });
+      input.addEventListener('keydown', event => navigateSheetCell(input, event));
+      td.append(input);
+      if (rowIndex === 0 && autoFilter.enabled) {
+        td.classList.add('sheet-filter-cell');
+        input.classList.add('has-filter-button');
+        const filterButton = document.createElement('button');
+        filterButton.type = 'button';
+        filterButton.className = 'sheet-filter-trigger';
+        const activeColumnFilter = Object.prototype.hasOwnProperty.call(autoFilter.filters, String(c));
+        filterButton.classList.toggle('has-filter', activeColumnFilter);
+        filterButton.textContent = '▾';
+        filterButton.title = 'Filter column ' + letter(c);
+        filterButton.setAttribute('aria-label', (activeColumnFilter ? 'Edit active filter for column ' : 'Filter column ') + letter(c));
+        filterButton.setAttribute('aria-expanded', String(state.sheetFilterMenuColumn === c));
+        filterButton.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (state.sheetFilterMenuColumn === c) closeSheetFilterMenu();
+          else openSheetFilterMenu(c);
+        });
+        td.append(filterButton);
+        renderSheetFilterMenu(td, c);
+      }
+      tr.append(td);
+    }
     tbody.append(tr);
-  }); table.append(tbody); sheetWrap.innerHTML=''; sheetWrap.append(table);
+  });
+  table.append(tbody);
+  sheetWrap.innerHTML = '';
+  sheetWrap.append(table);
   applySheetRangeHighlight();
   renderSheetTabs();
   updateSheetFormulaBar();
 }
+
 function renderSlides() {
   const doc=activeDoc(); if(!Array.isArray(doc.slides)||!doc.slides.length)doc.slides=[{title:t('common.newSlide'),body:''}];
   doc.current=Math.min(Math.max(0,doc.current||0),doc.slides.length-1); const slide=doc.slides[doc.current];
