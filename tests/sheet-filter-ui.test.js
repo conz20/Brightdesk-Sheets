@@ -24,7 +24,7 @@ test('worksheet column filters use accessible controls and text-safe value rende
   const app = read('src/app.js');
   assert.match(app, /sheet-filter-trigger/);
   assert.match(app, /sheet-filter-menu/);
-  assert.match(app, /role', 'dialog'/);
+  assert.match(app, /role', 'group'/);
   assert.match(app, /aria-label/);
   assert.match(app, /optionLabel\.textContent/);
   assert.match(app, /getUniqueColumnValues/);
