@@ -275,7 +275,7 @@ function readExcelCellStyle(cell) {
   };
   const format = String(cell.numFmt || '').toLowerCase();
   if (format.includes('%')) style.numberFormat = 'percent';
-)) style.numberFormat = 'currency';
+  else if (format.includes('$')) style.numberFormat = 'currency';
   else if (/d{1,2}[^a-z]*m{1,4}[^a-z]*y{2,4}/i.test(format) || /y{2,4}[^a-z]*m{1,4}[^a-z]*d{1,2}/i.test(format)) style.numberFormat = 'date';
   else if (format.includes('0') || format.includes('#')) style.numberFormat = 'number';
   const compact = Object.fromEntries(Object.entries(style).filter(([key, value]) => {
@@ -285,6 +285,7 @@ function readExcelCellStyle(cell) {
   }));
   return Object.keys(compact).length ? style : null;
 }
+function assertPresentationSlideLimit(slideCount) {
   if (slideCount > MAX_SLIDES) {
     throw new Error('The imported presentation exceeds the 2,000-slide limit.');
   }
