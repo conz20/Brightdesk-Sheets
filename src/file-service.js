@@ -272,12 +272,15 @@ function validateProject(project) {
       if (doc.cells !== undefined) validateProjectGrid(doc.cells);
       if (doc.styles !== undefined) assertCellStyles(doc.styles);
       if (doc.autoFilter !== undefined) assertAutoFilterState(doc.autoFilter);
+      if (doc.tables !== undefined) assertTableCollection(doc.tables, doc.cells || []);
       if (doc.worksheets !== undefined) {
         if (!Array.isArray(doc.worksheets) || doc.worksheets.length < 1 || doc.worksheets.length > MAX_WORKSHEETS) {
           throw new Error('The Brightdesk Sheets workbook has an invalid worksheet collection.');
         }
         const worksheetIds = new Set();
         const worksheetNames = new Set();
+        const workbookTableNames = new Set();
+        const workbookTableIds = new Set();
         let workbookCellCount = 0;
         for (const worksheet of doc.worksheets) {
           if (!isPlainObject(worksheet) || typeof worksheet.id !== 'string' || !worksheet.id.trim()) {
@@ -289,6 +292,7 @@ function validateProject(project) {
           workbookCellCount += validateProjectGrid(worksheet.cells);
           assertCellStyles(worksheet.styles);
           if (worksheet.autoFilter !== undefined) assertAutoFilterState(worksheet.autoFilter);
+          if (worksheet.tables !== undefined) assertTableCollection(worksheet.tables, worksheet.cells, { names: workbookTableNames, ids: workbookTableIds });
           if (workbookCellCount > MAX_SHEET_CELLS) throw new Error('The Brightdesk Sheets workbook exceeds the 250,000-cell project limit.');
         }
         if (doc.activeWorksheetId !== undefined &&
