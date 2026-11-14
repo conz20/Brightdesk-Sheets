@@ -50,13 +50,14 @@ These are configured build targets, not confirmation that a package has passed i
 - Edit values in a spreadsheet grid and use the formula bar.
 - Work across named worksheets: add, switch, rename, reorder and delete tabs. The final worksheet cannot be deleted.
 - Navigate directly to a cell with the Name Box, edit its raw value or formula in a dedicated formula bar, and adjust worksheet zoom from the status bar.
+- Format the selected cell as bold, italic or underlined; choose a safe text/fill colour; and display numbers as Number, Currency (AUD), Percentage or Date. Formatting is kept separately for each worksheet.
 - Undo and redo spreadsheet edits with the Home ribbon or Ctrl+Z / Ctrl+Y, including cell changes, row/column additions, sorting and worksheet management.
 - Existing single-grid workbooks migrate to a first worksheet without changing their saved cell values.
 - Calculate basic arithmetic and supported range functions, including SUM, AVERAGE, MIN, MAX, COUNT and COUNTA.
 - Add rows and columns, sort a selected column, and import/export CSV and XLSX files. XLSX carries all worksheets; CSV import/export applies to one worksheet at a time.
 - Keep workbook data and worksheet names on the device as part of the Brightdesk project.
 
-**Implementation status:** The draft development change adds worksheet management, A1 Name Box navigation, a dedicated formula bar, keyboard movement (Enter, Tab and arrow keys), bounded undo/redo history for cell edits and worksheet operations, worksheet status/zoom controls, and direct cross-worksheet references. It supports SUM, AVERAGE, MIN, MAX, COUNT and COUNTA across worksheet ranges, including quoted worksheet names. These changes are implemented on the review branch only; they are not yet release-verified. Exact-head automated checks, real ExcelJS file round trips and native desktop verification remain outstanding.
+**Implementation status:** The draft development change adds worksheet management, A1 Name Box navigation, a dedicated formula bar, keyboard movement (Enter, Tab and arrow keys), bounded undo/redo history for cell edits, formatting and worksheet operations, worksheet status/zoom controls, supported cell formatting (bold, italic, underline, safe colours and basic number formats), and direct cross-worksheet references. It supports SUM, AVERAGE, MIN, MAX, COUNT and COUNTA across worksheet ranges, including quoted worksheet names. These changes are implemented on the review branch only; they are not yet release-verified. Exact-head automated checks, real ExcelJS file round trips (including the new basic formatting mappings) and native desktop verification remain outstanding.
 
 **Known boundaries:** This is not full Excel compatibility. VBA/macros, pivot tables, charts and broad advanced-function coverage are not established. Complex workbook fidelity and exact Excel round-trip compatibility remain unverified.
 ## Download
