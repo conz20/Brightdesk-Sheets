@@ -954,9 +954,14 @@ function setCell(row,col,value) {
   const current = String(cells?.[row]?.[col] ?? '');
   if (current === String(value ?? '')) return;
   recordSheetHistory();
-  while (activeDoc().cells.length <= row) activeDoc().cells.push([]);
-  while (activeDoc().cells[row].length <= col) activeDoc().cells[row].push('');
-  activeDoc().cells[row][col] = String(value ?? '');
+  const updatedTableHeader = state.app === 'sheets'
+    ? sheetTables.updateWorkbookTableHeader(activeDoc(), row, col, value)
+    : null;
+  if (!updatedTableHeader) {
+    while (activeDoc().cells.length <= row) activeDoc().cells.push([]);
+    while (activeDoc().cells[row].length <= col) activeDoc().cells[row].push('');
+    activeDoc().cells[row][col] = String(value ?? '');
+  }
   persist();
 }
 function renameWorksheetFromPrompt(worksheetId) {
