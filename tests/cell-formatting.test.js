@@ -6,7 +6,9 @@ const {
   updateCellStyle,
   removeCellStyle,
   updateCellStylesInRange,
-  removeCellStylesInRange
+  removeCellStylesInRange,
+  fillCellStylesDown,
+  fillCellStylesRight
 } = require('../src/cell-formatting');
 
 test('normalizes supported cell formatting without accepting arbitrary properties', () => {
