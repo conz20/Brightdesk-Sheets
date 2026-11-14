@@ -234,7 +234,7 @@
         if (!/^[\d\s.eE+\-*/()%]+$/.test(expression)) throw new Error('Unsupported expression');
         result = arithmetic(expression);
       }
-      return Number.isFinite(result) ? Number(result.toFixed(8)) : '#VALUE!';
+      return Number.isFinite(result) ? Number(result.toPrecision(15)) : '#VALUE!';
     } catch {
       return '#VALUE!';
     } finally {
