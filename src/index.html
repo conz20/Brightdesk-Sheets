@@ -37,9 +37,32 @@
       <div class="document-bar"><input id="doc-title" value="Untitled document" aria-label="Document title" /><span class="local-tag" data-i18n="top.storedLocally">● Stored locally</span></div>
       <div id="ribbon-tabs" class="ribbon-tabs" role="tablist" aria-label="Application ribbon"></div>
       <div id="toolbar" class="toolbar" aria-label="Ribbon commands"></div>
+      <div id="sheet-formula-bar" class="sheet-formula-bar" role="group" aria-label="Cell reference and formula entry" hidden>
+        <div class="sheet-name-box-group">
+          <label for="sheet-name-box">Name Box</label>
+          <input id="sheet-name-box" type="text" value="A1" autocomplete="off" spellcheck="false" aria-label="Name Box. Enter a cell reference and press Enter to go to that cell.">
+        </div>
+        <span class="sheet-formula-symbol" aria-hidden="true">fx</span>
+        <div class="sheet-formula-input-group">
+          <label for="formula-input">Formula</label>
+          <input id="formula-input" class="formula-input" type="text" autocomplete="off" spellcheck="false" placeholder="Enter a value or formula" aria-label="Formula bar">
+        </div>
+      </div>
       <div id="editor" class="editor" contenteditable="true" spellcheck="true" aria-label="Document editor"></div>
       <div id="sheet-wrap" class="sheet-wrap" hidden></div>
       <div id="sheet-tabs" class="sheet-tabs" role="group" aria-label="Worksheet tabs" hidden></div>
+      <div id="sheet-status-bar" class="sheet-status-bar" role="status" aria-label="Worksheet status and zoom" hidden>
+        <div class="sheet-status-left">
+          <span id="sheet-status-message">Ready</span>
+          <span id="sheet-status-selection">Cell A1</span>
+          <span id="sheet-status-size">20 rows × 12 columns</span>
+        </div>
+        <div class="sheet-status-controls" aria-label="Worksheet zoom">
+          <button id="sheet-zoom-out" type="button" aria-label="Zoom out">−</button>
+          <button id="sheet-zoom-reset" type="button" aria-label="Reset zoom"><span id="sheet-zoom-value">100%</span></button>
+          <button id="sheet-zoom-in" type="button" aria-label="Zoom in">+</button>
+        </div>
+      </div>
       <div id="slide-wrap" class="slide-wrap" hidden></div>
       <div id="notes-wrap" class="notes-wrap" hidden><textarea id="notes-editor" aria-label="Notes editor" placeholder="Type a note, idea or reminder…" data-i18n-placeholder="common.notesPlaceholder"></textarea><div class="notes-hint" data-i18n="common.notesHint">Your notes save automatically on this device.</div></div>
       <section id="todo-wrap" class="todo-app" aria-label="Brightdesk To Do" hidden>
@@ -124,6 +147,7 @@
   <script src="i18n.js"></script>
   <script src="vendor/brightdesk-common-libs/json-storage.js"></script>
   <script src="workbook-model.js"></script>
+  <script src="sheet-navigation.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
