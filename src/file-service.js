@@ -206,7 +206,7 @@ function excelColumnNumber(label) {
 }
 
 function parseExcelCellAddress(value) {
-  const match = String(value || '').match(/^\\$?([A-Z]{1,3})\\$?([1-9]\\d*)$/i);
+  const match = String(value || '').match(/^\$?([A-Z]{1,3})\$?([1-9]\d*)$/i);
   if (!match) return null;
   return { row: Number(match[2]) - 1, column: excelColumnNumber(match[1]) - 1 };
 }
