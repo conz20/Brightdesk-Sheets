@@ -662,6 +662,34 @@ test('XLSX imports apply Brightdesk table colours even when the source only cont
 
 
 
+
+test('XLSX import converts rich text, hyperlinks and error cells to supported visible text', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-cell-values-'));
+  const filePath = path.join(directory, 'cell-values.xlsx');
+  const ExcelJS = require('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Imported values');
+  sheet.getCell('A1').value = {
+    richText: [{ text: 'Rich ' }, { text: 'text' }]
+  };
+  sheet.getCell('B1').value = {
+    text: 'Brightdesk website',
+    hyperlink: 'https://example.com'
+  };
+  sheet.getCell('C1').value = { error: '#DIV/0!' };
+
+  try {
+    await workbook.xlsx.writeFile(filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.deepEqual(imported.cells, [['Rich text', 'Brightdesk website', '#DIV/0!']]);
+    assert.doesNotThrow(() => validateProject({
+      docs: { sheets: { cells: imported.cells } }
+    }));
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('XLSX export preserves zero-padded identifiers and high-precision numbers as text', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-identifiers-'));
   const filePath = path.join(directory, 'identifiers.xlsx');
