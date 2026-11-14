@@ -885,3 +885,30 @@ test('file service keeps a single active import, export and validation implement
   }
 });
 
+test('XLSX import and export preserve formula expressions in worksheet cells', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-formulas-'));
+  const filePath = path.join(directory, 'formulas.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Formula workbook',
+    activeWorksheetId: 'formulas',
+    worksheets: [{
+      id: 'formulas',
+      name: 'Formulas',
+      cells: [
+        ['Item', 'Net', 'Gross'],
+        ['Pen', 10, '=B2*1.1'],
+        ['Paper', 20, '=SUM(B2:B3)*1.1']
+      ]
+    }]
+  };
+
+  try {
+    await exportOfficeFile(payload, filePath);
+    const reopened = await openOfficeFile(filePath);
+    assert.deepEqual(reopened.worksheets[0].cells, payload.worksheets[0].cells);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
