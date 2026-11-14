@@ -154,6 +154,89 @@
     return next;
   }
 
+  function cloneCellGrid(cells) {
+    if (!Array.isArray(cells) || cells.some(row => !Array.isArray(row))) {
+      throw new TypeError('The active worksheet must contain a valid cell grid.');
+    }
+    return cells.map(row => row.map(value => value ?? ''));
+  }
+
+  function cloneStyleMap(styles) {
+    if (!styles || typeof styles !== 'object' || Array.isArray(styles)) return {};
+    return Object.fromEntries(Object.entries(styles).map(([address, style]) => [
+      address,
+      style && typeof style === 'object' && !Array.isArray(style) ? { ...style } : style
+    ]));
+  }
+
+  function cloneTableList(tables) {
+    return (Array.isArray(tables) ? tables : []).map(table => ({
+      ...table,
+      range: table?.range ? { ...table.range } : table?.range,
+      columns: Array.isArray(table?.columns) ? table.columns.slice() : table?.columns
+    }));
+  }
+
+  function getWorkbookContext(workbook) {
+    if (!workbook || typeof workbook !== 'object' ||
+        !Array.isArray(workbook.worksheets) || !workbook.worksheets.length) {
+      throw new TypeError('A workbook with at least one worksheet is required.');
+    }
+    const activeSheet = workbook.worksheets.find(sheet => sheet?.id === workbook.activeWorksheetId);
+    if (!activeSheet) throw new Error('The active worksheet could not be found.');
+
+    const cells = Array.isArray(workbook.cells) ? workbook.cells : activeSheet.cells;
+    const tables = Array.isArray(workbook.tables) ? workbook.tables : activeSheet.tables;
+    const styles = workbook.styles && typeof workbook.styles === 'object' && !Array.isArray(workbook.styles)
+      ? workbook.styles
+      : activeSheet.styles;
+    const otherTables = workbook.worksheets
+      .filter(sheet => sheet !== activeSheet)
+      .flatMap(sheet => Array.isArray(sheet?.tables) ? sheet.tables : []);
+
+    return { workbook, activeSheet, cells, tables, styles, otherTables };
+  }
+
+  function syncWorkbookTableState(context, cells, tables, styles) {
+    const nextCells = cloneCellGrid(cells);
+    const nextTables = cloneTableList(tables);
+    const nextStyles = cloneStyleMap(styles);
+
+    context.activeSheet.cells = cloneCellGrid(nextCells);
+    context.activeSheet.tables = cloneTableList(nextTables);
+    context.activeSheet.styles = cloneStyleMap(nextStyles);
+    context.workbook.cells = cloneCellGrid(nextCells);
+    context.workbook.tables = cloneTableList(nextTables);
+    context.workbook.styles = cloneStyleMap(nextStyles);
+  }
+
+  function createWorkbookTable(workbook, range, requestedName) {
+    const context = getWorkbookContext(workbook);
+    const result = createTable(context.tables || [], context.cells, range, requestedName, context.otherTables);
+    const styles = applyTableStyles(context.styles, result.table);
+    syncWorkbookTableState(context, result.cells, result.tables, styles);
+    return { ...result.table, range: { ...result.table.range }, columns: result.table.columns.slice() };
+  }
+
+  function renameWorkbookTable(workbook, tableId, requestedName) {
+    const context = getWorkbookContext(workbook);
+    const tables = renameTable(context.tables || [], tableId, requestedName, context.otherTables);
+    syncWorkbookTableState(context, context.cells, tables, context.styles);
+    const renamed = tables.find(table => table.id === tableId);
+    return { ...renamed, range: { ...renamed.range }, columns: renamed.columns.slice() };
+  }
+
+  function removeWorkbookTable(workbook, tableId) {
+    const context = getWorkbookContext(workbook);
+    if (!(context.tables || []).some(table => table.id === tableId)) {
+      throw new Error('The selected table could not be found.');
+    }
+    const removed = context.tables.find(table => table.id === tableId);
+    const tables = removeTable(context.tables, tableId);
+    syncWorkbookTableState(context, context.cells, tables, context.styles);
+    return { ...removed, range: { ...removed.range }, columns: removed.columns.slice() };
+  }
+
   return {
     MAX_TABLE_CELLS,
     MAX_TABLES,
@@ -164,6 +247,9 @@
     renameTable,
     removeTable,
     findTableAtCell,
-    applyTableStyles
+    applyTableStyles,
+    createWorkbookTable,
+    renameWorkbookTable,
+    removeWorkbookTable
   };
 });
