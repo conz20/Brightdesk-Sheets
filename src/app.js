@@ -46,11 +46,13 @@ const workbookModel = window.BrightdeskWorkbookModel;
 const sheetNavigation = window.BrightdeskSheetNavigation;
 const sheetHistory = window.BrightdeskSheetHistory;
 const cellFormatting = window.BrightdeskCellFormatting;
+const sheetClipboard = window.BrightdeskSheetClipboard;
 if (!commonJsonStorage) throw new Error('Brightdesk common storage helper was not loaded.');
 if (!workbookModel) throw new Error('Brightdesk worksheet model was not loaded.');
 if (!sheetNavigation) throw new Error('Brightdesk sheet navigation helpers were not loaded.');
 if (!sheetHistory) throw new Error('Brightdesk sheet history helpers were not loaded.');
 if (!cellFormatting) throw new Error('Brightdesk cell formatting helpers were not loaded.');
+if (!sheetClipboard) throw new Error('Brightdesk sheet clipboard helpers were not loaded.');
 const workbookHistory = sheetHistory.createHistory({ limit: 100, clone });
 
 function clone(value) { return commonJsonStorage.cloneJsonValue(value); }
@@ -170,6 +172,49 @@ function applySelectedCellStyle(changes) {
   renderSheet();
   renderToolbar();
   setStatus(`Formatting applied to ${address}`);
+}
+function writeSelectedCellToClipboard(event) {
+  if (state.app !== 'sheets' || !event.clipboardData) return false;
+  const { row, col } = state.selectedCell;
+  event.clipboardData.setData('text/plain', sheetClipboard.serializeClipboardGrid([[cellRaw(row, col)]]));
+  event.preventDefault();
+  return true;
+}
+function cutSelectedSheetCell(event) {
+  if (!writeSelectedCellToClipboard(event)) return;
+  const { row, col } = state.selectedCell;
+  setCell(row, col, '');
+  refreshSheetValues();
+  updateSheetFormulaBar();
+  setStatus(`Cut ${selectedCellAddress()}`);
+}
+function pasteIntoSelectedSheetCell(event) {
+  if (state.app !== 'sheets' || !event.clipboardData) return;
+  event.preventDefault();
+  const text = event.clipboardData.getData('text/plain');
+  if (!text) return;
+  try {
+    const clipboardGrid = sheetClipboard.parseClipboardGrid(text);
+    const { row, col } = state.selectedCell;
+    const nextCells = sheetClipboard.pasteClipboardGrid(activeDoc().cells, row, col, clipboardGrid);
+    const activeId = activeDoc().activeWorksheetId;
+    const otherCellCount = activeDoc().worksheets
+      .filter(sheet => sheet.id !== activeId)
+      .reduce((total, sheet) => total + (sheet.cells || []).reduce((count, line) => count + line.length, 0), 0);
+    const nextCellCount = nextCells.reduce((count, line) => count + line.length, 0);
+    if (otherCellCount + nextCellCount > sheetNavigation.MAX_SHEET_CELLS) {
+      throw new RangeError('The paste would exceed the 250,000-cell workbook limit.');
+    }
+    recordSheetHistory();
+    activeDoc().cells = nextCells;
+    persist();
+    renderSheet();
+    renderToolbar();
+    const columns = clipboardGrid.reduce((maximum, line) => Math.max(maximum, line.length), 0);
+    setStatus(`Pasted ${clipboardGrid.length} rows × ${columns} columns at ${sheetNavigation.formatCellAddress(row, col)}`);
+  } catch (error) {
+    setStatus(`Paste failed: ${error.message}`);
+  }
 }
 function clearSelectedCellStyle() {
   const address = selectedCellAddress();
@@ -1260,6 +1305,9 @@ $('check-current-document').addEventListener('click',checkCurrentDocumentSpellin
 $('back-to-apps').addEventListener('click',()=>{state.view=state.setupComplete?'workspace':'manager';render();});
 $('finish-app-setup').addEventListener('click',()=>{if(state.setupComplete){state.view='workspace';render();}else completeAppSetup();});
 $('doc-title').addEventListener('change',()=>{activeDoc().title=$('doc-title').value;persist();});
+sheetWrap.addEventListener('copy', writeSelectedCellToClipboard);
+sheetWrap.addEventListener('cut', cutSelectedSheetCell);
+sheetWrap.addEventListener('paste', pasteIntoSelectedSheetCell);
 $('sheet-name-box').addEventListener('keydown', event => {
   if (event.key === 'Enter') {
     event.preventDefault();
