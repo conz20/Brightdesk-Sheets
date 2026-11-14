@@ -227,25 +227,32 @@ function selectedCellClipboardValue() {
   }
   return cellRaw(row, col);
 }
-function writeSelectedCellToClipboard(event, value = selectedCellClipboardValue()) {
+function writeSelectedCellToClipboard(event, value = selectedSheetClipboardGrid()) {
   if (state.app !== 'sheets' || !event.clipboardData) return false;
-  event.clipboardData.setData('text/plain', sheetClipboard.serializeClipboardGrid([[value]]));
+  event.clipboardData.setData('text/plain', sheetClipboard.serializeClipboardGrid(value));
   event.preventDefault();
   return true;
 }
 function cutSelectedSheetCell(event) {
-  const value = selectedCellClipboardValue();
-  if (!writeSelectedCellToClipboard(event, value)) return;
-  const { row, col } = state.selectedCell;
-  if (cellRaw(row, col) !== '') {
-    recordSheetHistory();
-    activeDoc().cells[row][col] = '';
-    persist();
+  const range = currentSheetRange();
+  const values = selectedSheetClipboardGrid();
+  if (!writeSelectedCellToClipboard(event, values)) return;
+  const active = document.activeElement;
+  if (active && active.classList && active.classList.contains('grid-cell') && active.dataset.edited === 'true') {
+    const row = Number(active.dataset.row), col = Number(active.dataset.col);
+    activeDoc().cells[row][col] = active.value;
+    active.dataset.edited = 'false';
   }
-  const input = sheetWrap.querySelector(`input.grid-cell[data-row="${row}"][data-col="${col}"]`);
-  if (input) { input.value = ''; input.dataset.edited = 'false'; }
+  recordSheetHistory();
+  activeDoc().cells = sheetRange.clearRangeValues(activeDoc().cells || [], range);
+  persist();
+  renderSheet();
+  renderToolbar();
+  const selector = 'input.grid-cell[data-row="' + state.selectedCell.row + '"][data-col="' + state.selectedCell.col + '"]';
+  const target = sheetWrap.querySelector(selector);
+  if (target) target.focus({ preventScroll: true });
   updateSheetFormulaBar();
-  setStatus(`Cut ${selectedCellAddress()}`);
+  setStatus(selectedRangeStatus('Cut', range));
 }
 function pasteIntoSelectedSheetCell(event) {
   if (state.app !== 'sheets' || !event.clipboardData) return;
