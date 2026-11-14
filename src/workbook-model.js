@@ -7,6 +7,7 @@
 
 const DEFAULT_ROW_COUNT = 20;
 const DEFAULT_COLUMN_COUNT = 12;
+const MAX_WORKSHEETS = 256;
 
 function cloneGrid(cells, fallback = createEmptyGrid()) {
   if (!Array.isArray(cells)) return cloneGrid(fallback, createEmptyGrid());
@@ -174,6 +175,9 @@ function activateWorksheet(document, worksheetId) {
 }
 
 function addWorksheet(document, requestedName) {
+  if (Array.isArray(document?.worksheets) && document.worksheets.length >= MAX_WORKSHEETS) {
+    throw new RangeError(`A workbook cannot contain more than ${MAX_WORKSHEETS} worksheets.`);
+  }
   syncActiveWorksheet(document);
   const usedNames = new Set(document.worksheets.map(sheet => sheet.name.toLocaleLowerCase()));
   const usedIds = new Set(document.worksheets.map(sheet => sheet.id));
@@ -237,6 +241,7 @@ function moveWorksheet(document, worksheetId, targetIndex) {
 return {
   DEFAULT_ROW_COUNT,
   DEFAULT_COLUMN_COUNT,
+  MAX_WORKSHEETS,
   createEmptyGrid,
   cloneCellStyles,
   cloneAutoFilterState,
