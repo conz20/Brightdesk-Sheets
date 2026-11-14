@@ -303,3 +303,47 @@ test('XLSX round trip preserves cell number formats, font, fill and worksheet-sp
     assert.deepEqual(imported.styles, imported.worksheets[1].styles);
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+
+test('XLSX export applies legacy active-sheet styles to the actual active worksheet', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-active-sheet-style-'));
+  const filePath = path.join(directory, 'active-sheet-style.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Active style',
+    activeWorksheetId: 'second',
+    styles: { A1: { bold: true, numberFormat: 'currency' } },
+    worksheets: [
+      { id: 'first', name: 'First', cells: [['One']] },
+      { id: 'second', name: 'Second', cells: [['Two']] }
+    ]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.equal(imported.worksheets[0].styles.A1, undefined);
+    assert.equal(imported.worksheets[1].styles.A1.bold, true);
+    assert.equal(imported.worksheets[1].styles.A1.numberFormat, 'currency');
+    assert.equal(imported.activeWorksheetId, 'sheet-2');
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('XLSX round trip preserves ISO date cells as dates with the selected display format', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-date-format-'));
+  const filePath = path.join(directory, 'date-format.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Date values',
+    worksheets: [{
+      id: 'dates',
+      name: 'Dates',
+      cells: [['2026-11-14']],
+      styles: { A1: { numberFormat: 'date' } }
+    }]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.equal(imported.cells[0][0], '2026-11-14');
+    assert.equal(imported.styles.A1.numberFormat, 'date');
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
