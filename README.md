@@ -111,6 +111,10 @@ A scheduled maintenance validation runs every **Monday at 04:17 UTC**. The sched
 
 The Windows, macOS and Linux installer matrix remains available through a manual workflow dispatch with `build_installers: true`. Publishing remains a separate opt-in action with `publish_release: true`. This keeps routine checks lighter without removing any operating-system build target or reducing cross-platform release coverage.
 
+## GridCraft feature and visual parity
+
+The [GridCraft feature and visual parity study](docs/GRIDCRAFT_FEATURE_AND_VISUAL_PARITY.md) compares the six public reference guides with the verified Sheets baseline and defines the Brightdesk-native workspace, feature gaps, acceptance evidence and implementation order. It is a requirements document, not a claim that planned capabilities are already implemented.
+
 ## Spreadsheet reference study
 
 The [GridCraft reference study and Brightdesk Sheets roadmap](docs/GRIDCRAFT_REFERENCE_AND_SHEETS_ROADMAP.md) records feature research, the current verified first-use scope, proposed priorities, acceptance evidence and licensing boundaries. It is a development roadmap, not a claim of GridCraft or Excel parity.
