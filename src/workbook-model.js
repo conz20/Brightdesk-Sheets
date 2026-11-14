@@ -54,6 +54,9 @@ function normalizeWorkbook(document, fallbackCells = createEmptyGrid()) {
   const sourceSheets = Array.isArray(source.worksheets) && source.worksheets.length
     ? source.worksheets
     : [{ id: 'sheet-1', name: 'Sheet1', cells: source.cells || fallbackCells }];
+  const requestedActiveId = typeof source.activeWorksheetId === 'string' ? source.activeWorksheetId : '';
+  const requestedActiveIndex = sourceSheets.findIndex(sheet => sheet?.id === requestedActiveId);
+  const activeStyleIndex = requestedActiveIndex >= 0 ? requestedActiveIndex : 0;
   const usedIds = new Set();
   const usedNames = new Set();
   normalized.worksheets = sourceSheets.map((sheet, index) => {
@@ -70,11 +73,10 @@ function normalizeWorkbook(document, fallbackCells = createEmptyGrid()) {
       id,
       name,
       cells: cloneGrid(sheet?.cells, fallbackCells),
-      styles: cloneCellStyles(sheet?.styles ?? (index === 0 ? source.styles : null))
+      styles: cloneCellStyles(sheet?.styles ?? (index === activeStyleIndex ? source.styles : null))
     };
   });
 
-  const requestedActiveId = typeof source.activeWorksheetId === 'string' ? source.activeWorksheetId : '';
   const active = normalized.worksheets.find(sheet => sheet.id === requestedActiveId) || normalized.worksheets[0];
   normalized.activeWorksheetId = active.id;
   // Keep the legacy `cells` property as the active-sheet view for older readers.
