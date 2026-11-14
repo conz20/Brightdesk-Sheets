@@ -194,3 +194,20 @@ test('formula arithmetic does not silently round or underflow numeric literals',
   assert.equal(calculateCell(cells, 0, 2), 0);
   assert.equal(calculateCell(cells, 0, 3), 123);
 });
+
+
+test('formula results preserve useful decimal precision beyond eight places', () => {
+  const cells = [[
+    '0.123456789',
+    '1e-12',
+    '=A1+0',
+    '=B1+0',
+    '=SUM(A1:A1)',
+    '=AVERAGE(B1:B1)'
+  ]];
+
+  assert.equal(calculateCell(cells, 0, 2), 0.123456789);
+  assert.equal(calculateCell(cells, 0, 3), 1e-12);
+  assert.equal(calculateCell(cells, 0, 4), 0.123456789);
+  assert.equal(calculateCell(cells, 0, 5), 1e-12);
+});
