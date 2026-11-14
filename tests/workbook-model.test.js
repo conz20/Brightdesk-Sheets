@@ -94,3 +94,47 @@ test('synchronises the active sheet before the workbook is persisted', () => {
   assert.deepEqual(restored.cells, [['updated']]);
   assert.deepEqual(restored.worksheets[0].cells, [['updated']]);
 });
+
+test('preserves cell formatting independently for each worksheet when switching and saving', () => {
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'sales',
+    worksheets: [
+      { id: 'sales', name: 'Sales', cells: [['100']], styles: { A1: { bold: true, numberFormat: 'currency' } } },
+      { id: 'costs', name: 'Costs', cells: [['25']], styles: { A1: { italic: true, fill: '#EDF7F1' } } }
+    ]
+  });
+
+  assert.deepEqual(workbook.styles, { A1: { bold: true, numberFormat: 'currency' } });
+  activateWorksheet(workbook, 'costs');
+  assert.deepEqual(workbook.styles, { A1: { italic: true, fill: '#EDF7F1' } });
+  workbook.styles.A1.underline = true;
+  syncActiveWorksheet(workbook);
+
+  const restored = normalizeWorkbook(JSON.parse(JSON.stringify(workbook)));
+  assert.deepEqual(restored.worksheets[0].styles, { A1: { bold: true, numberFormat: 'currency' } });
+  assert.deepEqual(restored.worksheets[1].styles, { A1: { italic: true, fill: '#EDF7F1', underline: true } });
+  assert.deepEqual(restored.styles, restored.worksheets[1].styles);
+});
+
+test('new worksheets start with no formatting and keep existing worksheet styles', () => {
+  const workbook = normalizeWorkbook({
+    cells: [['keep']],
+    styles: { A1: { bold: true } }
+  });
+  addWorksheet(workbook, 'Summary');
+  assert.deepEqual(workbook.worksheets[0].styles, { A1: { bold: true } });
+  assert.deepEqual(workbook.styles, {});
+  assert.deepEqual(workbook.worksheets[1].styles, {});
+});
+
+test('deleting the active worksheet restores the remaining worksheet formatting', () => {
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'second',
+    worksheets: [
+      { id: 'first', name: 'First', cells: [['one']], styles: { A1: { bold: true } } },
+      { id: 'second', name: 'Second', cells: [['two']], styles: { A1: { italic: true } } }
+    ]
+  });
+  deleteWorksheet(workbook, 'second');
+  assert.deepEqual(workbook.styles, { A1: { bold: true } });
+});
