@@ -54,6 +54,7 @@ const cellFormatting = window.BrightdeskCellFormatting;
 const sheetClipboard = window.BrightdeskSheetClipboard;
 const sheetRange = window.BrightdeskSheetRange;
 const sheetDataTools = window.BrightdeskSheetDataTools;
+const sheetTables = window.BrightdeskSheetTables;
 const sheetFill = window.BrightdeskSheetFill;
 if (!commonJsonStorage) throw new Error('Brightdesk common storage helper was not loaded.');
 if (!workbookModel) throw new Error('Brightdesk worksheet model was not loaded.');
@@ -63,6 +64,7 @@ if (!cellFormatting) throw new Error('Brightdesk cell formatting helpers were no
 if (!sheetClipboard) throw new Error('Brightdesk sheet clipboard helpers were not loaded.');
 if (!sheetRange) throw new Error('Brightdesk worksheet range helpers were not loaded.');
 if (!sheetDataTools) throw new Error('Brightdesk worksheet filter and sort helpers were not loaded.');
+if (!sheetTables) throw new Error('Brightdesk structured table helpers were not loaded.');
 if (!sheetFill) throw new Error('Brightdesk Fill Down/Right helpers were not loaded.');
 const workbookHistory = sheetHistory.createHistory({ limit: 100, clone });
 
@@ -488,6 +490,12 @@ function renderToolbar() {
       filterButton.classList.toggle('active', activeDoc().autoFilter?.enabled === true);
       const clearFilters = addButton(data, 'Clear all filters', clearAllSheetFilters, 'Show all rows on this worksheet');
       clearFilters.disabled = !Object.keys(activeDoc().autoFilter?.filters || {}).length;
+      const table = selectedStructuredTable();
+      addButton(data, 'Format as Table', createStructuredTable, 'Create a structured table from the selected cell range');
+      const renameTable = addButton(data, 'Rename Table', renameStructuredTable, 'Rename the table containing the selected cell');
+      renameTable.disabled = !table;
+      const convertTable = addButton(data, 'Convert to Range', convertStructuredTableToRange, 'Keep the table data and formatting but remove table behaviour');
+      convertTable.disabled = !table;
     } else {
       const view = group('zoom');
       addButton(view, label('zoomOut'), () => changeSheetZoom(-10)); addButton(view, `${state.sheetZoom}%`, () => { state.sheetZoom = 100; applySheetZoom(); }); addButton(view, label('zoomIn'), () => changeSheetZoom(10));
@@ -837,6 +845,88 @@ function renderSheetFilterMenu(cell, column) {
   menu.append(heading, search, actions, status, options, footer);
   cell.append(menu);
   renderOptions();
+}
+function allOtherWorksheetTables(doc, activeWorksheetId = doc.activeWorksheetId) {
+  return (doc.worksheets || [])
+    .filter(sheet => sheet.id !== activeWorksheetId)
+    .flatMap(sheet => Array.isArray(sheet.tables) ? sheet.tables : []);
+}
+function selectedStructuredTable() {
+  return sheetTables.findTableAtCell(
+    activeDoc().tables || [],
+    state.selectedCell.row,
+    state.selectedCell.col
+  );
+}
+function createStructuredTable() {
+  const doc = activeDoc();
+  const range = currentSheetRange();
+  if (range.rowCount < 2) {
+    setStatus('Select a header row and at least one data row before formatting as a table');
+    return;
+  }
+  const existingTables = allOtherWorksheetTables(doc);
+  const defaultName = 'Table' + (existingTables.length + (doc.tables || []).length + 1);
+  const requestedName = window.prompt('Table name', defaultName);
+  if (requestedName === null) return;
+  try {
+    const result = sheetTables.createTable(
+      doc.tables || [],
+      doc.cells || [],
+      range,
+      requestedName,
+      existingTables
+    );
+    recordSheetHistory();
+    doc.cells = result.cells;
+    doc.tables = result.tables;
+    doc.styles = sheetTables.applyTableStyles(doc.styles || {}, result.table);
+    persist();
+    renderSheet();
+    renderToolbar();
+    setStatus('Created table ' + result.table.name + ' · ' + result.table.columns.length + ' columns');
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+function renameStructuredTable() {
+  const doc = activeDoc();
+  const table = selectedStructuredTable();
+  if (!table) {
+    setStatus('Select a cell inside a table first');
+    return;
+  }
+  const requestedName = window.prompt('Table name', table.name);
+  if (requestedName === null) return;
+  try {
+    const tables = sheetTables.renameTable(
+      doc.tables || [],
+      table.id,
+      requestedName,
+      allOtherWorksheetTables(doc)
+    );
+    recordSheetHistory();
+    doc.tables = tables;
+    persist();
+    renderToolbar();
+    setStatus('Renamed table to ' + requestedName.trim());
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+function convertStructuredTableToRange() {
+  const doc = activeDoc();
+  const table = selectedStructuredTable();
+  if (!table) {
+    setStatus('Select a cell inside a table first');
+    return;
+  }
+  if (!window.confirm('Convert ' + table.name + ' to a normal cell range? Your cell values and formatting will remain.')) return;
+  recordSheetHistory();
+  doc.tables = sheetTables.removeTable(doc.tables || [], table.id);
+  persist();
+  renderToolbar();
+  setStatus('Converted ' + table.name + ' to a normal range. Cell values and formatting were kept.');
 }
 function sortSheetColumn(descending) {
   recordSheetHistory();
