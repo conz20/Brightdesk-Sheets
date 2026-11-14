@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const {
   parseCellAddress,
   formatCellAddress,
-  ensureCellExists
+  ensureCellExists,
+  getKeyboardNavigationTarget
 } = require('../src/sheet-navigation');
 
 test('parses cell addresses case-insensitively and beyond column Z', () => {
@@ -59,4 +60,33 @@ test('handles large existing grids without overflowing a spread operation', () =
 test('rejects invalid grid structures before expanding them', () => {
   assert.throws(() => ensureCellExists(null, 1, 1), /valid cell grid/i);
   assert.throws(() => ensureCellExists([['x'], null], 1, 1), /valid cell grid/i);
+});
+
+test('maps Enter and Shift+Enter to vertical cell movement', () => {
+  assert.deepEqual(getKeyboardNavigationTarget({ row: 4, col: 2, key: 'Enter' }), { row: 5, col: 2 });
+  assert.deepEqual(getKeyboardNavigationTarget({ row: 4, col: 2, key: 'Enter', shiftKey: true }), { row: 3, col: 2 });
+});
+
+test('maps Tab and Shift+Tab to horizontal cell movement', () => {
+  assert.deepEqual(getKeyboardNavigationTarget({ row: 4, col: 2, key: 'Tab' }), { row: 4, col: 3 });
+  assert.deepEqual(getKeyboardNavigationTarget({ row: 4, col: 2, key: 'Tab', shiftKey: true }), { row: 4, col: 1 });
+});
+
+test('maps arrow keys to adjacent cells without moving the caret mid-text', () => {
+  assert.deepEqual(getKeyboardNavigationTarget({ row: 4, col: 2, key: 'ArrowUp' }), { row: 3, col: 2 });
+  assert.deepEqual(getKeyboardNavigationTarget({ row: 4, col: 2, key: 'ArrowDown' }), { row: 5, col: 2 });
+  assert.deepEqual(getKeyboardNavigationTarget({ row: 4, col: 2, key: 'ArrowLeft', value: 'value', selectionStart: 0, selectionEnd: 0 }), { row: 4, col: 1 });
+  assert.deepEqual(getKeyboardNavigationTarget({ row: 4, col: 2, key: 'ArrowRight', value: 'value', selectionStart: 5, selectionEnd: 5 }), { row: 4, col: 3 });
+  assert.equal(getKeyboardNavigationTarget({ row: 4, col: 2, key: 'ArrowLeft', value: 'value', selectionStart: 2, selectionEnd: 2 }), null);
+  assert.equal(getKeyboardNavigationTarget({ row: 4, col: 2, key: 'ArrowRight', value: 'value', selectionStart: 2, selectionEnd: 2 }), null);
+  assert.equal(getKeyboardNavigationTarget({ row: 4, col: 2, key: 'ArrowLeft', value: 'value', selectionStart: 0, selectionEnd: 2 }), null);
+});
+
+test('keeps keyboard navigation inside the supported spreadsheet boundaries', () => {
+  assert.equal(getKeyboardNavigationTarget({ row: 0, col: 0, key: 'ArrowUp' }), null);
+  assert.equal(getKeyboardNavigationTarget({ row: 0, col: 0, key: 'ArrowLeft', value: '', selectionStart: 0, selectionEnd: 0 }), null);
+  assert.equal(getKeyboardNavigationTarget({ row: 0, col: 0, key: 'Tab', shiftKey: true }), null);
+  assert.equal(getKeyboardNavigationTarget({ row: 1048575, col: 16383, key: 'Enter' }), null);
+  assert.equal(getKeyboardNavigationTarget({ row: 1048575, col: 16383, key: 'Tab' }), null);
+  assert.equal(getKeyboardNavigationTarget({ row: 3, col: 3, key: 'Escape' }), null);
 });
