@@ -2,6 +2,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { TextDecoder } = require('node:util');
 const appCatalog = require('./app-catalog');
+const { applyTableStyles } = require('./sheet-tables');
 
 const MAX_PROJECT_BYTES = 50 * 1024 * 1024;
 const MAX_DOCUMENT_TEXT_BYTES = 10 * 1024 * 1024;
@@ -490,7 +491,7 @@ async function openOfficeFile(filePath) {
             range.bottom >= rows.length || range.right - range.left + 1 !== columns.length) {
           continue;
         }
-        importedWorksheet.tables.push({
+        const importedTable = {
           id: `table-${workbookCellCount}-${importedWorksheet.tables.length + 1}`,
           name: model.name,
           range,
@@ -498,7 +499,9 @@ async function openOfficeFile(filePath) {
           headerRow: true,
           totalsRow: false,
           style: 'brightdesk-green'
-        });
+        };
+        importedWorksheet.tables.push(importedTable);
+        importedWorksheet.styles = applyTableStyles(importedWorksheet.styles, importedTable);
       }
       worksheets.push(importedWorksheet);
     });
