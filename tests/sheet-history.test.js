@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createHistory, capture, undo, redo, canUndo, canRedo } = require('../src/sheet-history');
+const { createWorkbookTable, updateWorkbookTableHeader } = require('../src/sheet-tables');
 
 test('undo restores the previous workbook snapshot without sharing mutable data', () => {
   const history = createHistory();
@@ -68,4 +69,38 @@ test('empty undo and redo return null and expose their availability', () => {
   assert.equal(redo(history, { value: 1 }), null);
   assert.equal(canUndo(history), false);
   assert.equal(canRedo(history), false);
+});
+
+
+test('undo and redo restore edited table column names together with header cells', () => {
+  const workbook = {
+    activeWorksheetId: 'sales',
+    cells: [['Product', 'Amount'], ['Pen', 10]],
+    styles: {},
+    tables: [],
+    worksheets: [{
+      id: 'sales',
+      name: 'Sales',
+      cells: [['Product', 'Amount'], ['Pen', 10]],
+      styles: {},
+      tables: []
+    }]
+  };
+  createWorkbookTable(workbook, { top: 0, left: 0, bottom: 1, right: 1 }, 'SalesTable');
+
+  const history = createHistory();
+  capture(history, workbook);
+  updateWorkbookTableHeader(workbook, 0, 1, 'Revenue');
+  assert.deepEqual(workbook.cells[0], ['Product', 'Revenue']);
+  assert.deepEqual(workbook.tables[0].columns, ['Product', 'Revenue']);
+
+  const restored = undo(history, workbook);
+  assert.deepEqual(restored.cells[0], ['Product', 'Amount']);
+  assert.deepEqual(restored.tables[0].columns, ['Product', 'Amount']);
+  assert.deepEqual(restored.worksheets[0].tables[0].columns, ['Product', 'Amount']);
+
+  const reapplied = redo(history, restored);
+  assert.deepEqual(reapplied.cells[0], ['Product', 'Revenue']);
+  assert.deepEqual(reapplied.tables[0].columns, ['Product', 'Revenue']);
+  assert.deepEqual(reapplied.worksheets[0].tables[0].columns, ['Product', 'Revenue']);
 });
