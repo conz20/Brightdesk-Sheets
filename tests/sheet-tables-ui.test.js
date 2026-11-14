@@ -79,3 +79,14 @@ test('editing a table header updates the table column definition before saving',
   assert.ok(handler.includes('recordSheetHistory()'));
   assert.ok(handler.includes('persist()'));
 });
+
+
+test('saving worksheet edits reconciles structured table headers before local persistence', () => {
+  const app = read('src/app.js');
+  const start = app.indexOf('function persist()');
+  const end = app.indexOf('function loadLocal()', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = app.slice(start, end);
+  assert.ok(handler.includes('sheetTables.synchronizeWorkbookTableHeaders(state.docs.sheets)'));
+  assert.ok(handler.indexOf('sheetTables.synchronizeWorkbookTableHeaders(') < handler.indexOf('workbookModel.syncActiveWorksheet('));
+});
