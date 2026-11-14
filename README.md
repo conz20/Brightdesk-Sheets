@@ -93,7 +93,7 @@ Use win on Windows or linux on Linux instead of mac.
 
 ## Project structure
 
-- src/ — Brightdesk desktop renderer and product modules.
+- src/ — Brightdesk desktop renderer and product modules, including `src/workbook-model.js` for workbook migration and worksheet management.
 - `assets/icons/sheets.svg` — original Brightdesk Sheets application icon.
 - `assets/previews/sheets-workspace.svg` — workspace interface design.
 - scripts/ — build and release verification tools.
