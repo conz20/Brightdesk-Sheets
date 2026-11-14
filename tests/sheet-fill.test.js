@@ -54,3 +54,16 @@ test('rejects formula references shifted beyond spreadsheet boundaries', () => {
   assert.throws(() => translateFormulaReferences('=A1', -1, 0), /outside the supported spreadsheet range/i);
   assert.throws(() => translateFormulaReferences('=XFD1', 0, 1), /outside the supported spreadsheet range/i);
 });
+
+
+test('fill down and fill right preserve scientific-notation constants', () => {
+  const down = fillRangeDown([['=1E3+A1'], [''], ['']], {
+    top: 0, left: 0, bottom: 2, right: 0
+  });
+  assert.deepEqual(down, [['=1E3+A1'], ['=1E3+A2'], ['=1E3+A3']]);
+
+  const right = fillRangeRight([['=1E3+A1', '', '']], {
+    top: 0, left: 0, bottom: 0, right: 2
+  });
+  assert.deepEqual(right, [['=1E3+A1', '=1E3+B1', '=1E3+C1']]);
+});
