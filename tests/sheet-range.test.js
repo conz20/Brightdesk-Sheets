@@ -17,7 +17,7 @@ test('extracts rectangular cell values including blank cells beyond used grid ed
 test('clears the selected rectangle without mutating the original worksheet', () => {
   const source = [['A', 'B', 'C'], ['D', 'E', 'F'], ['G', 'H', 'I']];
   const result = clearRangeValues(source, { top: 0, left: 1, bottom: 1, right: 2 });
-  assert.deepEqual(result, [['A', '', ''], ['D', '', 'F'], ['G', 'H', 'I']]);
+  assert.deepEqual(result, [['A', '', ''], ['D', '', ''], ['G', 'H', 'I']]);
   assert.deepEqual(source, [['A', 'B', 'C'], ['D', 'E', 'F'], ['G', 'H', 'I']]);
 });
 
@@ -27,5 +27,5 @@ test('rejects selection ranges beyond the supported cell limit', () => {
 
 test('rejects invalid cell coordinates and incomplete ranges', () => {
   assert.throws(() => rangeFromCells({ row: -1, col: 0 }, { row: 0, col: 0 }), /valid cell/i);
-  assert.throws(() => extractRangeValues([['A']], { top: 0, left: 0, bottom: 0, right: -1 }), /valid range/i);
+  assert.throws(() => extractRangeValues([['A']], { top: 0, left: 0, bottom: 0, right: -1 }), /valid cell range/i);
 });
