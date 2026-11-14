@@ -113,3 +113,10 @@ test('formulas keep hexadecimal and binary-looking cell values as text', () => {
   assert.equal(calculateCell(cells, 0, 5), 1);
   assert.equal(calculateCell(cells, 0, 6), 3);
 });
+
+test('single-cell aggregate references propagate formula errors like one-cell ranges', () => {
+  const cells = [['=Missing!A1', '=SUM(A1)', '=SUM(A1:A1)']];
+
+  assert.equal(calculateCell(cells, 0, 1), '#VALUE!');
+  assert.equal(calculateCell(cells, 0, 2), '#VALUE!');
+});
