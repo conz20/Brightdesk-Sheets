@@ -1050,7 +1050,11 @@ function renderSheetTabs() {
   actions.className = 'sheet-tab-actions';
   const add = document.createElement('button');
   add.type = 'button'; add.className = 'sheet-tab-action'; add.textContent = '+ Sheet';
-  add.setAttribute('aria-label', 'Add worksheet'); add.title = 'Add worksheet';
+  add.setAttribute('aria-label', 'Add worksheet');
+  add.disabled = worksheets.length >= workbookModel.MAX_WORKSHEETS;
+  add.title = add.disabled
+    ? `A workbook can contain up to ${workbookModel.MAX_WORKSHEETS} worksheets`
+    : 'Add worksheet';
   add.addEventListener('click', () => {
     recordSheetHistory();
     workbookModel.addWorksheet(doc);
