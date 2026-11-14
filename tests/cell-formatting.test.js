@@ -94,10 +94,10 @@ test('Fill Down copies the first row formatting through the selected range', () 
     B1: { numberFormat: 'currency' }
   }, { top: 0, left: 0, bottom: 2, right: 1 });
 
-  assert.deepEqual(styles.A2, styles.A1);
-  assert.deepEqual(styles.A3, styles.A1);
-  assert.deepEqual(styles.B2, styles.B1);
-  assert.deepEqual(styles.B3, styles.B1);
+  assert.deepEqual(styles.A2, normalizeCellStyle(styles.A1));
+  assert.deepEqual(styles.A3, normalizeCellStyle(styles.A1));
+  assert.deepEqual(styles.B2, normalizeCellStyle(styles.B1));
+  assert.deepEqual(styles.B3, normalizeCellStyle(styles.B1));
 });
 
 test('Fill Right copies the first column formatting across the selected range', () => {
@@ -107,10 +107,10 @@ test('Fill Right copies the first column formatting across the selected range', 
     A2: { fill: '#EDF7F1' }
   }, { top: 0, left: 0, bottom: 1, right: 2 });
 
-  assert.deepEqual(styles.B1, styles.A1);
-  assert.deepEqual(styles.C1, styles.A1);
-  assert.deepEqual(styles.B2, styles.A2);
-  assert.deepEqual(styles.C2, styles.A2);
+  assert.deepEqual(styles.B1, normalizeCellStyle(styles.A1));
+  assert.deepEqual(styles.C1, normalizeCellStyle(styles.A1));
+  assert.deepEqual(styles.B2, normalizeCellStyle(styles.A2));
+  assert.deepEqual(styles.C2, normalizeCellStyle(styles.A2));
 });
 
 test('fill operations remove destination formatting when the source cell is unformatted', () => {
