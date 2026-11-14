@@ -872,3 +872,16 @@ test('XLSX round trip keeps table column names in sync after a header cell edit'
     await fs.rm(directory, { recursive: true, force: true });
   }
 });
+
+test('file service keeps a single active import, export and validation implementation', async () => {
+  const source = await fs.readFile(path.join(__dirname, '../src/file-service.js'), 'utf8');
+  for (const declaration of [
+    /^async function openOfficeFile\(/gm,
+    /^async function exportOfficeFile\(/gm,
+    /^function validateProject\(/gm,
+    /^module\.exports =/gm
+  ]) {
+    assert.equal([...source.matchAll(declaration)].length, 1);
+  }
+});
+
