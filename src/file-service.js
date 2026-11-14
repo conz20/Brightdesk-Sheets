@@ -73,7 +73,7 @@ function assertCellStyles(styles) {
   const supportedFormats = new Set(['general', 'number', 'currency', 'percent', 'date']);
   const allowedProperties = new Set(['bold', 'italic', 'underline', 'fill', 'color', 'numberFormat']);
   for (const [address, style] of Object.entries(styles)) {
-    if (!/^[A-Z]{1,3}[1-9]\\d*$/i.test(address)) {
+    if (!/^[A-Z]{1,3}[1-9]\d*$/i.test(address)) {
       throw new Error('The Brightdesk Sheets workbook contains an invalid cell address in its formatting.');
     }
     if (!isPlainObject(style) || Object.keys(style).some(key => !allowedProperties.has(key))) {
