@@ -280,3 +280,43 @@ test('rejects imported workbooks containing more than 256 worksheets without tru
   assert.equal(worksheets.length, 257);
   assert.equal(worksheets[256].cells[0][0], 'value-257');
 });
+
+
+test('renaming a worksheet updates cross-sheet cell and range formula references', () => {
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'summary',
+    worksheets: [
+      { id: 'revenue', name: 'Revenue', cells: [['10', '20']] },
+      { id: 'summary', name: 'Summary', cells: [[
+        '=Revenue!A1+Revenue!B1',
+        '=SUM(Revenue!A1:B1)',
+        "='Revenue'!A1"
+      ]] }
+    ]
+  });
+
+  renameWorksheet(workbook, 'revenue', 'Q4 Revenue');
+
+  assert.equal(workbook.worksheets[1].cells[0][0], "='Q4 Revenue'!A1+'Q4 Revenue'!B1");
+  assert.equal(workbook.worksheets[1].cells[0][1], "=SUM('Q4 Revenue'!A1:B1)");
+  assert.equal(workbook.worksheets[1].cells[0][2], "='Q4 Revenue'!A1");
+  assert.equal(workbook.cells[0][0], "='Q4 Revenue'!A1+'Q4 Revenue'!B1");
+});
+
+test('renaming a worksheet quotes new names and escapes apostrophes in formula references', () => {
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'summary',
+    worksheets: [
+      { id: 'source', name: 'Source', cells: [['5']] },
+      { id: 'summary', name: 'Summary', cells: [[
+        '=Source!A1',
+        "='Source'!A1"
+      ]] }
+    ]
+  });
+
+  renameWorksheet(workbook, 'source', "O'Brien Data");
+
+  assert.equal(workbook.worksheets[1].cells[0][0], "='O''Brien Data'!A1");
+  assert.equal(workbook.worksheets[1].cells[0][1], "='O''Brien Data'!A1");
+});
