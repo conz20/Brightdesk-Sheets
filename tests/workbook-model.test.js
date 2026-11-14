@@ -152,3 +152,56 @@ test('applies legacy top-level formatting to the selected active worksheet', () 
   assert.deepEqual(workbook.worksheets[0].styles, {});
   assert.deepEqual(workbook.worksheets[1].styles, { B1: { numberFormat: 'currency' } });
 });
+
+
+test('preserves AutoFilter settings independently for each worksheet', () => {
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'sales',
+    worksheets: [
+      { id: 'sales', name: 'Sales', cells: [['Region'], ['East'], ['West']], autoFilter: { enabled: true, filters: { '0': ['East'] } } },
+      { id: 'costs', name: 'Costs', cells: [['Status'], ['Open'], ['Closed']], autoFilter: { enabled: false, filters: {} } }
+    ]
+  });
+  assert.deepEqual(workbook.autoFilter, { enabled: true, filters: { '0': ['East'] } });
+  activateWorksheet(workbook, 'costs');
+  assert.deepEqual(workbook.autoFilter, { enabled: false, filters: {} });
+  workbook.autoFilter = { enabled: true, filters: { '0': ['Open'] } };
+  syncActiveWorksheet(workbook);
+  const restored = normalizeWorkbook(JSON.parse(JSON.stringify(workbook)));
+  assert.deepEqual(restored.worksheets[0].autoFilter, { enabled: true, filters: { '0': ['East'] } });
+  assert.deepEqual(restored.worksheets[1].autoFilter, { enabled: true, filters: { '0': ['Open'] } });
+});
+
+test('creates new worksheets with filtering disabled and does not inherit the previous sheet filters', () => {
+  const workbook = normalizeWorkbook({
+    cells: [['Region'], ['East']],
+    autoFilter: { enabled: true, filters: { '0': ['East'] } }
+  });
+  addWorksheet(workbook, 'Summary');
+  assert.deepEqual(workbook.autoFilter, { enabled: false, filters: {} });
+  assert.deepEqual(workbook.worksheets[0].autoFilter, { enabled: true, filters: { '0': ['East'] } });
+  assert.deepEqual(workbook.worksheets[1].autoFilter, { enabled: false, filters: {} });
+});
+
+test('deleting the active worksheet restores the remaining worksheet filter state', () => {
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'second',
+    worksheets: [
+      { id: 'first', name: 'First', cells: [['Status'], ['Open']], autoFilter: { enabled: true, filters: { '0': ['Open'] } } },
+      { id: 'second', name: 'Second', cells: [['Status'], ['Closed']], autoFilter: { enabled: true, filters: { '0': ['Closed'] } } }
+    ]
+  });
+  deleteWorksheet(workbook, 'second');
+  assert.deepEqual(workbook.autoFilter, { enabled: true, filters: { '0': ['Open'] } });
+});
+
+test('sanitizes invalid AutoFilter keys and values when recovering workbook data', () => {
+  const workbook = normalizeWorkbook({
+    cells: [['Region'], ['East']],
+    autoFilter: {
+      enabled: true,
+      filters: { '0': ['East', 'East', 3, ''], '-1': ['invalid'], '20000': ['outside'] }
+    }
+  });
+  assert.deepEqual(workbook.autoFilter, { enabled: true, filters: { '0': ['East', ''] } });
+});
