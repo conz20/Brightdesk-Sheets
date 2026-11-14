@@ -158,3 +158,15 @@ test('formula calculations preserve zero-padded and high-precision identifiers a
   assert.equal(calculateCell(cells, 0, 7), 3);
   assert.equal(calculateCell(cells, 0, 8), 10);
 });
+
+test('formula references do not turn non-zero underflow values into zero', () => {
+  const cells = [['1e-999', '0e-999', '=A1+1', '=B1+1', '=SUM(A1:B1)', '=COUNT(A1:B1)', '=COUNTA(A1:B1)']];
+
+  assert.equal(calculateCell(cells, 0, 0), '1e-999');
+  assert.equal(calculateCell(cells, 0, 1), 0);
+  assert.equal(calculateCell(cells, 0, 2), '#VALUE!');
+  assert.equal(calculateCell(cells, 0, 3), 1);
+  assert.equal(calculateCell(cells, 0, 4), 0);
+  assert.equal(calculateCell(cells, 0, 5), 1);
+  assert.equal(calculateCell(cells, 0, 6), 2);
+});
