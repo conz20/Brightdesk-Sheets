@@ -755,6 +755,34 @@ test('XLSX export counts significant digits without counting exponent digits', a
   }
 });
 
+
+test('XLSX export preserves non-zero values that underflow JavaScript numbers', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-underflow-'));
+  const filePath = path.join(directory, 'underflow.xlsx');
+  const positiveTiny = '1e-999';
+  const negativeTiny = '-1e-999';
+  const payload = {
+    kind: 'sheets',
+    title: 'Tiny values',
+    worksheets: [{
+      id: 'tiny',
+      name: 'Tiny',
+      cells: [['Positive', 'Negative', 'Zero'], [positiveTiny, negativeTiny, '0e-999']]
+    }]
+  };
+
+  try {
+    await exportOfficeFile(payload, filePath);
+    const reopened = await openOfficeFile(filePath);
+    const row = reopened.worksheets[0].cells[1];
+    assert.equal(row[0], positiveTiny);
+    assert.equal(row[1], negativeTiny);
+    assert.equal(row[2], 0);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('XLSX round trip keeps table column names in sync after a header cell edit', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-edited-table-header-'));
   const filePath = path.join(directory, 'edited-header.xlsx');
