@@ -9,6 +9,16 @@
     return value - 1;
   }
 
+
+  function numericCellValue(value) {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value !== 'string') return null;
+    const text = value.trim();
+    if (!/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?$/i.test(text)) return null;
+    const number = Number(text);
+    return Number.isFinite(number) ? number : null;
+  }
+
   function arithmetic(expression) {
     const source = String(expression ?? '');
     const tokens = [];
@@ -128,7 +138,7 @@
 
   function calculateCell(cells, row, col, stack = new Set(), context = {}) {
     const raw = String(cells?.[row]?.[col] ?? '').trim();
-    if (!raw.startsWith('=')) return raw !== '' && Number.isFinite(Number(raw)) ? Number(raw) : (raw || '');
+    if (!raw.startsWith('=')) return numericCellValue(raw) ?? (raw || '');
 
     const currentSheetId = context.activeWorksheetId || '__current__';
     const id = `${currentSheetId}:${row}:${col}`;
@@ -184,9 +194,8 @@
       if (fn) {
         const values = splitArguments(fn[2]).flatMap(getRange);
         const numbers = values
-          .filter(value => value !== '' && value !== null && value !== undefined && !(typeof value === 'string' && value.trim() === ''))
-          .map(Number)
-          .filter(Number.isFinite);
+          .map(numericCellValue)
+          .filter(value => value !== null);
         switch (fn[1].toUpperCase()) {
           case 'SUM': result = numbers.reduce((sum, number) => sum + number, 0); break;
           case 'AVERAGE': result = numbers.length ? numbers.reduce((sum, number) => sum + number, 0) / numbers.length : 0; break;
