@@ -254,11 +254,8 @@ function cutSelectedSheetCell(event) {
   recordSheetHistory();
   activeDoc().cells = sheetRange.clearRangeValues(activeDoc().cells || [], range);
   persist();
-  renderSheet();
+  refreshSheetAfterFilterableEdit();
   renderToolbar();
-  const selector = 'input.grid-cell[data-row="' + state.selectedCell.row + '"][data-col="' + state.selectedCell.col + '"]';
-  const target = sheetWrap.querySelector(selector);
-  if (target) target.focus({ preventScroll: true });
   updateSheetFormulaBar();
   setStatus(selectedRangeStatus('Cut', range));
 }
@@ -598,6 +595,26 @@ function keepSelectedSheetCellVisible() {
   const nextRow = visibleRows.find(row => row > 0) ?? visibleRows[0] ?? 0;
   resetSheetSelection(nextRow, state.selectedCell.col);
   return true;
+}
+function refreshSheetAfterFilterableEdit() {
+  if (!activeDoc().autoFilter?.enabled) {
+    refreshSheetValues();
+    return false;
+  }
+  const moved = keepSelectedSheetCellVisible();
+  if (moved) {
+    renderSheet();
+    renderToolbar();
+    const target = sheetWrap.querySelector(
+      'input.grid-cell[data-row="' + state.selectedCell.row + '"][data-col="' + state.selectedCell.col + '"]'
+    );
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    updateSheetFormulaBar();
+    return true;
+  }
+  refreshSheetValues();
+  return false;
 }
 function toggleSheetAutoFilter() {
   const current = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter);
@@ -978,14 +995,20 @@ function navigateSheetCell(input, event) {
 
   const nextTarget = { ...target };
   const filterState = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter);
-  if (filterState.enabled && nextTarget.row !== row) {
+  if (filterState.enabled) {
     const visibleRows = visibleSheetRowIndexes();
     if (!visibleRows.includes(nextTarget.row)) {
       const direction = nextTarget.row > row ? 1 : -1;
-      const candidates = direction > 0
+      let candidates = direction > 0
         ? visibleRows.filter(visibleRow => visibleRow > row)
         : visibleRows.filter(visibleRow => visibleRow < row).reverse();
+      if (!candidates.length && nextTarget.row === row) {
+        candidates = visibleRows
+          .filter(visibleRow => visibleRow > 0)
+          .sort((left, right) => Math.abs(left - row) - Math.abs(right - row));
+      }
       if (!candidates.length) {
+        event.preventDefault();
         keepSelectedSheetCellVisible();
         renderSheet();
         setStatus('No more visible rows in that direction');
@@ -1084,12 +1107,8 @@ function renderSheet() {
         const changed = input.dataset.edited === 'true';
         if (changed) setCell(rowIndex, c, input.value);
         input.dataset.edited = 'false';
-        if (changed && autoFilter.enabled) {
-          keepSelectedSheetCellVisible();
-          renderSheet();
-        } else {
-          refreshSheetValues();
-        }
+        if (changed) refreshSheetAfterFilterableEdit();
+        else refreshSheetValues();
       });
       input.addEventListener('keydown', event => navigateSheetCell(input, event));
       td.append(input);
@@ -1793,7 +1812,7 @@ $('sheet-name-box').addEventListener('change', event => {
 });
 $('formula-input').addEventListener('change', event => {
   setCell(state.selectedCell.row, state.selectedCell.col, event.currentTarget.value);
-  refreshSheetValues();
+  refreshSheetAfterFilterableEdit();
 });
 $('sheet-zoom-out').addEventListener('click', () => changeSheetZoom(-10));
 $('sheet-zoom-in').addEventListener('click', () => changeSheetZoom(10));
