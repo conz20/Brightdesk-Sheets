@@ -52,6 +52,7 @@ const sheetHistory = window.BrightdeskSheetHistory;
 const cellFormatting = window.BrightdeskCellFormatting;
 const sheetClipboard = window.BrightdeskSheetClipboard;
 const sheetRange = window.BrightdeskSheetRange;
+const sheetFill = window.BrightdeskSheetFill;
 if (!commonJsonStorage) throw new Error('Brightdesk common storage helper was not loaded.');
 if (!workbookModel) throw new Error('Brightdesk worksheet model was not loaded.');
 if (!sheetNavigation) throw new Error('Brightdesk sheet navigation helpers were not loaded.');
@@ -59,6 +60,7 @@ if (!sheetHistory) throw new Error('Brightdesk sheet history helpers were not lo
 if (!cellFormatting) throw new Error('Brightdesk cell formatting helpers were not loaded.');
 if (!sheetClipboard) throw new Error('Brightdesk sheet clipboard helpers were not loaded.');
 if (!sheetRange) throw new Error('Brightdesk worksheet range helpers were not loaded.');
+if (!sheetFill) throw new Error('Brightdesk Fill Down/Right helpers were not loaded.');
 const workbookHistory = sheetHistory.createHistory({ limit: 100, clone });
 
 function clone(value) { return commonJsonStorage.cloneJsonValue(value); }
@@ -469,6 +471,9 @@ function renderToolbar() {
       const editing = group('editing');
       addButton(editing, 'Undo', () => applySheetHistory('undo'), 'Undo the last spreadsheet change');
       addButton(editing, 'Redo', () => applySheetHistory('redo'), 'Redo the last undone spreadsheet change');
+      const fill = group('fill');
+      addButton(fill, 'Fill Down', fillSelectedRangeDown, 'Repeat the first selected row down the selected range');
+      addButton(fill, 'Fill Right', fillSelectedRangeRight, 'Repeat the first selected column across the selected range');
     } else if (tab === 'insert') {
       const insert = group('tools'); addButton(insert, label('newRow'), addSheetRow); addButton(insert, label('newColumn'), addSheetColumn);
     } else if (tab === 'formulas') {
@@ -518,6 +523,50 @@ function renderToolbar() {
     const dictionaryTools = ribbonGroup(toolbar, 'Dictionary');
     addButton(dictionaryTools, 'Check spelling', checkCurrentDocumentSpelling, 'Check this document with the selected open-source dictionary');
   }
+}
+function fillSelectedRangeDown() {
+  const range = currentSheetRange();
+  if (range.rowCount < 2) { setStatus('Select at least two rows to Fill Down.'); return; }
+  try {
+    const cells = sheetFill.fillRangeDown(activeDoc().cells || [], range);
+    const styles = cellFormatting.fillCellStylesDown(activeDoc().styles || {}, range);
+    const otherCellCount = activeDoc().worksheets
+      .filter(sheet => sheet.id !== activeDoc().activeWorksheetId)
+      .reduce((total, sheet) => total + (sheet.cells || []).reduce((count, line) => count + line.length, 0), 0);
+    const nextCellCount = cells.reduce((count, line) => count + line.length, 0);
+    if (otherCellCount + nextCellCount > sheetNavigation.MAX_SHEET_CELLS) {
+      throw new RangeError('Fill Down would exceed the 250,000-cell workbook limit.');
+    }
+    recordSheetHistory();
+    activeDoc().cells = cells;
+    activeDoc().styles = styles;
+    persist();
+    renderSheet();
+    renderToolbar();
+    setStatus(selectedRangeStatus('Filled down', range));
+  } catch (error) { setStatus('Fill Down failed: ' + error.message); }
+}
+function fillSelectedRangeRight() {
+  const range = currentSheetRange();
+  if (range.columnCount < 2) { setStatus('Select at least two columns to Fill Right.'); return; }
+  try {
+    const cells = sheetFill.fillRangeRight(activeDoc().cells || [], range);
+    const styles = cellFormatting.fillCellStylesRight(activeDoc().styles || {}, range);
+    const otherCellCount = activeDoc().worksheets
+      .filter(sheet => sheet.id !== activeDoc().activeWorksheetId)
+      .reduce((total, sheet) => total + (sheet.cells || []).reduce((count, line) => count + line.length, 0), 0);
+    const nextCellCount = cells.reduce((count, line) => count + line.length, 0);
+    if (otherCellCount + nextCellCount > sheetNavigation.MAX_SHEET_CELLS) {
+      throw new RangeError('Fill Right would exceed the 250,000-cell workbook limit.');
+    }
+    recordSheetHistory();
+    activeDoc().cells = cells;
+    activeDoc().styles = styles;
+    persist();
+    renderSheet();
+    renderToolbar();
+    setStatus(selectedRangeStatus('Filled right', range));
+  } catch (error) { setStatus('Fill Right failed: ' + error.message); }
 }
 function addSheetRow() { recordSheetHistory(); const cells = activeDoc().cells; cells.push(Array(cells[0]?.length || 12).fill('')); renderSheet(); persist(); }
 function addSheetColumn() { recordSheetHistory(); activeDoc().cells.forEach(row => row.push('')); renderSheet(); persist(); }
