@@ -232,8 +232,8 @@ test('XLSX import and export preserve all worksheet names and values', async () 
     rows: [['Revenue', '100']],
     activeWorksheetId: 'sheet-2',
     worksheets: [
-      { id: 'sheet-1', name: 'Sales', cells: [['Revenue', '100'], ['North', '60']] },
-      { id: 'sheet-2', name: 'Costs', cells: [['Costs', '25'], ['Rent', '10']] }
+      { id: 'sheet-1', name: 'Sales', cells: [['Revenue', 100], ['North', 60]] },
+      { id: 'sheet-2', name: 'Costs', cells: [['Costs', 25], ['Rent', 10]] }
     ]
   };
   try {
