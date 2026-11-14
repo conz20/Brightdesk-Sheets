@@ -178,3 +178,19 @@ test('aggregate functions accept numeric and scientific-notation constants', () 
   assert.equal(calculateCell(cells, 0, 1), 2);
   assert.equal(calculateCell(cells, 0, 2), 2);
 });
+
+
+test('arithmetic rejects underflowing and over-precision numeric literals', () => {
+  assert.throws(() => arithmetic('1e-999'), /Invalid number/);
+  assert.throws(() => arithmetic('12345678901234567'), /Invalid number/);
+  assert.equal(arithmetic('0e-999'), 0);
+});
+
+test('formula arithmetic does not silently round or underflow numeric literals', () => {
+  const cells = [['=1e-999', '=12345678901234567', '=0e-999', '=00123']];
+
+  assert.equal(calculateCell(cells, 0, 0), '#VALUE!');
+  assert.equal(calculateCell(cells, 0, 1), '#VALUE!');
+  assert.equal(calculateCell(cells, 0, 2), 0);
+  assert.equal(calculateCell(cells, 0, 3), 123);
+});
