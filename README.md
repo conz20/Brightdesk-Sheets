@@ -50,8 +50,8 @@ These are configured build targets, not confirmation that a package has passed i
 - Edit values in a spreadsheet grid and use the formula bar.
 - Work across named worksheets: add, switch, rename, reorder and delete tabs. The final worksheet cannot be deleted.
 - Navigate directly to a cell with the Name Box, edit its raw value or formula in a dedicated formula bar, and adjust worksheet zoom from the status bar.
-- Format the selected cell as bold, italic or underlined; choose a safe text/fill colour; and display numbers as Number, Currency (AUD), Percentage or Date. Formatting is kept separately for each worksheet.
-- Copy or cut the selected cell and paste rectangular tab-separated blocks from other spreadsheet programs with Ctrl+C, Ctrl+X and Ctrl+V. Clipboard imports are quoted-field aware and bounded by the worksheet cell limit.
+- Shift-click to select a rectangular range of cells. Format the selected cell or range as bold, italic or underlined; choose a safe text/fill colour; and display numbers as Number, Currency (AUD), Percentage or Date. Formatting is kept separately for each worksheet.
+- Copy or cut selected cells and paste rectangular tab-separated blocks from other spreadsheet programs with Ctrl+C, Ctrl+X and Ctrl+V. Shift-click selects a block; paste starts at its top-left cell. Clipboard imports are quoted-field aware and bounded by the worksheet cell limit.
 - Undo and redo spreadsheet edits with the Home ribbon or Ctrl+Z / Ctrl+Y, including cell changes, row/column additions, sorting and worksheet management.
 - Existing single-grid workbooks migrate to a first worksheet without changing their saved cell values.
 - Calculate basic arithmetic and supported range functions, including SUM, AVERAGE, MIN, MAX, COUNT and COUNTA.
@@ -60,7 +60,7 @@ These are configured build targets, not confirmation that a package has passed i
 
 **Implementation status:** The draft development change adds worksheet management, A1 Name Box navigation, a dedicated formula bar, keyboard movement (Enter, Tab and arrow keys), bounded undo/redo history for cell edits, formatting and worksheet operations, worksheet status/zoom controls, supported cell formatting (bold, italic, underline, safe colours and basic number formats), local cell copy/cut and multi-cell clipboard paste, and direct cross-worksheet references. It supports SUM, AVERAGE, MIN, MAX, COUNT and COUNTA across worksheet ranges, including quoted worksheet names. These changes are implemented on the review branch only; they are not yet release-verified. Exact-head automated checks, real ExcelJS file round trips (including the new basic formatting mappings) and native desktop verification remain outstanding.
 
-**Known boundaries:** This is not full Excel compatibility. VBA/macros, pivot tables, charts and broad advanced-function coverage are not established. Copy/cut currently acts on the active cell; relative formula references are not adjusted when a multi-cell clipboard block is pasted. CSV does not retain formatting. Complex workbook fidelity and exact Excel round-trip compatibility remain unverified.
+**Known boundaries:** This is not full Excel compatibility. VBA/macros, pivot tables, charts and broad advanced-function coverage are not established. Clipboard copy/cut and paste transfer cell contents (including formula text), not cell formatting; relative formula references are not adjusted when a multi-cell clipboard block is pasted. A cut clears cell contents but leaves the original cell formatting in place. CSV does not retain formatting. Complex workbook fidelity and exact Excel round-trip compatibility remain unverified.
 ## Download
 
 The latest desktop installers are published from this repository’s verified release workflow when a release is approved.
