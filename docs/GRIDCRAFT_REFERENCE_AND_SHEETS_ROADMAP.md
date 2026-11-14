@@ -48,6 +48,7 @@ The same review branch also introduces:
 - Cell and range formatting for bold, italic, underline, safe text/fill colours and basic number formats.
 - Copy/cut of selected cell blocks and paste of quoted tab/newline clipboard blocks. Clipboard parsing and paste size are bounded to protect workbook memory.
 - Fill Down and Fill Right, copying from the first selected row/column and translating supported relative A1 cell and range references.
+- Guarded Add Row and Add Column actions that refuse to expand beyond the 250,000-cell worksheet limit or Excel's row/column dimensions.
 - Bounded undo/redo history for cell changes, formatting, row/column additions, sorting and worksheet operations.
 
 Clipboard paste preserves formula text but does not translate its relative references or copy cell styles. Fill Down/Right does translate the supported relative reference subset. Neither behaviour implies full Excel formula compatibility. The draft still needs exact-head Node.js 24.22.2 tests and native desktop verification.
