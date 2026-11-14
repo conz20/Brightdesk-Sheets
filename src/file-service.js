@@ -97,6 +97,27 @@ function assertCellStyles(styles) {
   return styles;
 }
 
+function assertAutoFilterState(value) {
+  if (value === undefined) return {};
+  if (!isPlainObject(value) || typeof value.enabled !== 'boolean' ||
+      !isPlainObject(value.filters)) {
+    throw new Error('The Brightdesk Sheets workbook contains invalid worksheet filter settings.');
+  }
+  let totalValues = 0;
+  for (const [column, values] of Object.entries(value.filters)) {
+    if (!/^(?:0|[1-9]\\d*)$/.test(column) || !Number.isSafeInteger(Number(column)) ||
+        Number(column) >= 16_384 || !Array.isArray(values)) {
+      throw new Error('The Brightdesk Sheets workbook contains invalid worksheet filter settings.');
+    }
+    for (const entry of values) {
+      if (typeof entry !== 'string' || entry.length > 32_767 || ++totalValues > 250_000) {
+        throw new Error('The Brightdesk Sheets workbook contains invalid worksheet filter settings.');
+      }
+    }
+  }
+  return value;
+}
+
 function columnLabel(number) {
   let value = number;
   let label = '';
@@ -171,6 +192,7 @@ function validateProject(project) {
       };
       if (doc.cells !== undefined) validateProjectGrid(doc.cells);
       if (doc.styles !== undefined) assertCellStyles(doc.styles);
+      if (doc.autoFilter !== undefined) assertAutoFilterState(doc.autoFilter);
       if (doc.worksheets !== undefined) {
         if (!Array.isArray(doc.worksheets) || doc.worksheets.length < 1 || doc.worksheets.length > MAX_WORKSHEETS) {
           throw new Error('The Brightdesk Sheets workbook has an invalid worksheet collection.');
@@ -187,6 +209,7 @@ function validateProject(project) {
           assertWorksheetName(worksheet.name, worksheetNames);
           workbookCellCount += validateProjectGrid(worksheet.cells);
           assertCellStyles(worksheet.styles);
+          if (worksheet.autoFilter !== undefined) assertAutoFilterState(worksheet.autoFilter);
           if (workbookCellCount > MAX_SHEET_CELLS) throw new Error('The Brightdesk Sheets workbook exceeds the 250,000-cell project limit.');
         }
         if (doc.activeWorksheetId !== undefined &&
@@ -339,7 +362,9 @@ async function openOfficeFile(filePath) {
       assertSheetCellLimit(rows);
       workbookCellCount += rows.reduce((count, row) => count + row.length, 0);
       if (workbookCellCount > MAX_SHEET_CELLS) throw new Error('The imported spreadsheet exceeds the 250,000-cell limit.');
-      worksheets.push({ id: `sheet-${index + 1}`, name, cells: rows, styles });
+      const importedWorksheet = { id: `sheet-${index + 1}`, name, cells: rows, styles };
+      if (sheet.autoFilter) importedWorksheet.autoFilter = { enabled: true, filters: {} };
+      worksheets.push(importedWorksheet);
     });
     if (!worksheets.length) return { kind: 'sheets', title: path.basename(filePath, ext), cells: [[]] };
     const requestedActiveTab = Number(workbook.views?.[0]?.activeTab);
@@ -446,6 +471,11 @@ async function exportOfficeFile(payload, filePath) {
         const address = `${columnLabel(c + 1)}${r + 1}`;
         applyExcelCellStyle(cell, source.styles?.[address] || (index === activeTab ? payload.styles?.[address] : null));
       }));
+      const filterState = assertAutoFilterState(source.autoFilter ?? (index === activeTab ? payload.autoFilter : undefined));
+      const filterColumnCount = rows.reduce((maximum, row) => Math.max(maximum, row.length), 0);
+      if (filterState.enabled && rows.length > 0 && filterColumnCount > 0) {
+        sheet.autoFilter = `A1:${columnLabel(filterColumnCount)}${rows.length}`;
+      }
       sheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 1 }];
       sheet.columns.forEach(col => { col.width = 16; });
     });
