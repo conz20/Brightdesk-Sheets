@@ -6,6 +6,7 @@ const appCatalog = require('./app-catalog');
 const MAX_PROJECT_BYTES = 50 * 1024 * 1024;
 const MAX_DOCUMENT_TEXT_BYTES = 10 * 1024 * 1024;
 const MAX_SHEET_CELLS = 250_000;
+const MAX_WORKSHEETS = 256;
 const MAX_SLIDES = 2_000;
 const KNOWN_APP_IDS = new Set(appCatalog.map(app => app.id));
 const EXCLUDED_APP_IDS = new Set(['teams', 'outlook', 'onedrive']);
@@ -43,14 +44,25 @@ function assertSheetDimensions(rowCount, columnCount) {
 }
 
 function assertSheetCellLimit(rows) {
+  if (!Array.isArray(rows)) throw new Error('The imported spreadsheet has an invalid cell grid.');
   let cellCount = 0;
   for (const row of rows) {
-    if (!Array.isArray(row)) continue;
+    if (!Array.isArray(row)) throw new Error('The imported spreadsheet contains an invalid row.');
     cellCount += row.length;
     if (cellCount > MAX_SHEET_CELLS) {
       throw new Error('The imported spreadsheet exceeds the 250,000-cell limit.');
     }
   }
+}
+function assertWorksheetName(value, usedNames) {
+  const name = String(value ?? '').trim();
+  if (!name || name.length > 31 || /[\\/?*:[\]]/.test(name)) {
+    throw new Error('The workbook contains an invalid worksheet name.');
+  }
+  const key = name.toLocaleLowerCase();
+  if (usedNames.has(key)) throw new Error('The workbook contains a duplicate worksheet name.');
+  usedNames.add(key);
+  return name;
 }
 
 function assertPresentationSlideLimit(slideCount) {
@@ -81,15 +93,41 @@ function validateProject(project) {
     if (appId === 'notes' && doc.text !== undefined && (typeof doc.text !== 'string' || Buffer.byteLength(doc.text, 'utf8') > MAX_DOCUMENT_TEXT_BYTES)) {
       throw new Error('The Brightdesk Notes content is invalid or exceeds the 10 MB limit.');
     }
-    if (appId === 'sheets' && doc.cells !== undefined) {
-      if (!Array.isArray(doc.cells)) throw new Error('The Brightdesk Sheets workbook has an invalid cell grid.');
-      let cellCount = 0;
-      for (const row of doc.cells) {
-        if (!Array.isArray(row)) throw new Error('The Brightdesk Sheets workbook contains an invalid row.');
-        cellCount += row.length;
-        if (cellCount > MAX_SHEET_CELLS) throw new Error('The Brightdesk Sheets workbook exceeds the 250,000-cell project limit.');
-        if (row.some(cell => cell !== null && !['string', 'number', 'boolean'].includes(typeof cell))) {
-          throw new Error('The Brightdesk Sheets workbook contains an unsupported cell value.');
+    if (appId === 'sheets') {
+      const validateProjectGrid = rows => {
+        if (!Array.isArray(rows)) throw new Error('The Brightdesk Sheets workbook has an invalid cell grid.');
+        let count = 0;
+        for (const row of rows) {
+          if (!Array.isArray(row)) throw new Error('The Brightdesk Sheets workbook contains an invalid row.');
+          count += row.length;
+          if (count > MAX_SHEET_CELLS) throw new Error('The Brightdesk Sheets workbook exceeds the 250,000-cell project limit.');
+          if (row.some(cell => cell !== null && !['string', 'number', 'boolean'].includes(typeof cell))) {
+            throw new Error('The Brightdesk Sheets workbook contains an unsupported cell value.');
+          }
+        }
+        return count;
+      };
+      if (doc.cells !== undefined) validateProjectGrid(doc.cells);
+      if (doc.worksheets !== undefined) {
+        if (!Array.isArray(doc.worksheets) || doc.worksheets.length < 1 || doc.worksheets.length > MAX_WORKSHEETS) {
+          throw new Error('The Brightdesk Sheets workbook has an invalid worksheet collection.');
+        }
+        const worksheetIds = new Set();
+        const worksheetNames = new Set();
+        let workbookCellCount = 0;
+        for (const worksheet of doc.worksheets) {
+          if (!isPlainObject(worksheet) || typeof worksheet.id !== 'string' || !worksheet.id.trim()) {
+            throw new Error('The Brightdesk Sheets workbook contains an invalid worksheet.');
+          }
+          if (worksheetIds.has(worksheet.id)) throw new Error('The Brightdesk Sheets workbook contains a duplicate worksheet ID.');
+          worksheetIds.add(worksheet.id);
+          assertWorksheetName(worksheet.name, worksheetNames);
+          workbookCellCount += validateProjectGrid(worksheet.cells);
+          if (workbookCellCount > MAX_SHEET_CELLS) throw new Error('The Brightdesk Sheets workbook exceeds the 250,000-cell project limit.');
+        }
+        if (doc.activeWorksheetId !== undefined &&
+            (typeof doc.activeWorksheetId !== 'string' || !worksheetIds.has(doc.activeWorksheetId))) {
+          throw new Error('The Brightdesk Sheets workbook refers to an unknown active worksheet.');
         }
       }
     }
@@ -216,18 +254,33 @@ async function openOfficeFile(filePath) {
   if (ext === '.xlsx' || ext === '.xlsm') {
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook(); await workbook.xlsx.load(buffer);
-    const sheet = workbook.worksheets[0];
-    if (!sheet) return { kind: 'sheets', title: path.basename(filePath, ext), cells: [[]] };
-    assertSheetDimensions(sheet.rowCount, sheet.columnCount);
-    const rows = [];
-    sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-      rows[rowNumber - 1] = [];
-      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        rows[rowNumber - 1][colNumber - 1] = cell.formula ? `=${cell.formula}` : (cell.value?.result ?? cell.value ?? '');
+    if (workbook.worksheets.length > MAX_WORKSHEETS) throw new Error('The imported workbook exceeds the 256-worksheet limit.');
+    const usedNames = new Set();
+    const worksheets = [];
+    let workbookCellCount = 0;
+    workbook.worksheets.forEach((sheet, index) => {
+      assertSheetDimensions(sheet.rowCount, sheet.columnCount);
+      const name = assertWorksheetName(sheet.name || `Sheet${index + 1}`, usedNames);
+      const rows = [];
+      sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+        rows[rowNumber - 1] = [];
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          rows[rowNumber - 1][colNumber - 1] = cell.formula ? `=${cell.formula}` : (cell.value?.result ?? cell.value ?? '');
+        });
       });
+      assertSheetCellLimit(rows);
+      workbookCellCount += rows.reduce((count, row) => count + row.length, 0);
+      if (workbookCellCount > MAX_SHEET_CELLS) throw new Error('The imported spreadsheet exceeds the 250,000-cell limit.');
+      worksheets.push({ id: `sheet-${index + 1}`, name, cells: rows });
     });
-    assertSheetCellLimit(rows);
-    return { kind: 'sheets', title: path.basename(filePath, ext), cells: rows };
+    if (!worksheets.length) return { kind: 'sheets', title: path.basename(filePath, ext), cells: [[]] };
+    return {
+      kind: 'sheets',
+      title: path.basename(filePath, ext),
+      cells: worksheets[0].cells,
+      worksheets,
+      activeWorksheetId: worksheets[0].id
+    };
   }
   if (ext === '.csv' || ext === '.tsv') {
     const text = decodeUtf8(buffer, 'This imported file is not valid UTF-8 text.').replace(/^\uFEFF/, '');
@@ -293,14 +346,28 @@ async function exportOfficeFile(payload, filePath) {
   }
   if (kind === 'sheets' && (ext === '.xlsx' || ext === '.xlsm')) {
     const ExcelJS = require('exceljs');
-    const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet(payload.title || 'Sheet 1');
-    (payload.rows || []).forEach((row, r) => row.forEach((value, c) => {
-      const cell = sheet.getCell(r + 1, c + 1);
-      if (typeof value === 'string' && value.startsWith('=')) cell.value = { formula: value.slice(1) };
-      else cell.value = value === '' || value == null ? null : (Number.isFinite(Number(value)) && String(value).trim() !== '' ? Number(value) : value);
-    }));
-    sheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 1 }];
-    sheet.columns.forEach(col => { col.width = 16; });
+    const workbook = new ExcelJS.Workbook();
+    const sourceSheets = Array.isArray(payload.worksheets) && payload.worksheets.length
+      ? payload.worksheets
+      : [{ name: payload.title || 'Sheet1', cells: payload.rows || [] }];
+    if (sourceSheets.length > MAX_WORKSHEETS) throw new Error('The workbook exceeds the 256-worksheet limit.');
+    const usedNames = new Set();
+    let workbookCellCount = 0;
+    sourceSheets.forEach((source, index) => {
+      const name = assertWorksheetName(source?.name || (index === 0 ? payload.title || 'Sheet1' : `Sheet${index + 1}`), usedNames);
+      const rows = source?.cells || (index === 0 ? payload.rows || [] : []);
+      assertSheetCellLimit(rows);
+      workbookCellCount += rows.reduce((count, row) => count + row.length, 0);
+      if (workbookCellCount > MAX_SHEET_CELLS) throw new Error('The workbook exceeds the 250,000-cell limit.');
+      const sheet = workbook.addWorksheet(name);
+      rows.forEach((row, r) => row.forEach((value, c) => {
+        const cell = sheet.getCell(r + 1, c + 1);
+        if (typeof value === 'string' && value.startsWith('=')) cell.value = { formula: value.slice(1) };
+        else cell.value = value === '' || value == null ? null : (Number.isFinite(Number(value)) && String(value).trim() !== '' ? Number(value) : value);
+      }));
+      sheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 1 }];
+      sheet.columns.forEach(col => { col.width = 16; });
+    });
     await workbook.xlsx.writeFile(filePath); return;
   }
   if (kind === 'sheets' && ext === '.csv') {
