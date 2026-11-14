@@ -173,18 +173,32 @@ function applySelectedCellStyle(changes) {
   renderToolbar();
   setStatus(`Formatting applied to ${address}`);
 }
-function writeSelectedCellToClipboard(event) {
-  if (state.app !== 'sheets' || !event.clipboardData) return false;
+function selectedCellClipboardValue() {
   const { row, col } = state.selectedCell;
-  event.clipboardData.setData('text/plain', sheetClipboard.serializeClipboardGrid([[cellRaw(row, col)]]));
+  const active = document.activeElement;
+  if (active?.classList?.contains('grid-cell') &&
+      Number(active.dataset.row) === row && Number(active.dataset.col) === col) {
+    return active.value;
+  }
+  return cellRaw(row, col);
+}
+function writeSelectedCellToClipboard(event, value = selectedCellClipboardValue()) {
+  if (state.app !== 'sheets' || !event.clipboardData) return false;
+  event.clipboardData.setData('text/plain', sheetClipboard.serializeClipboardGrid([[value]]));
   event.preventDefault();
   return true;
 }
 function cutSelectedSheetCell(event) {
-  if (!writeSelectedCellToClipboard(event)) return;
+  const value = selectedCellClipboardValue();
+  if (!writeSelectedCellToClipboard(event, value)) return;
   const { row, col } = state.selectedCell;
-  setCell(row, col, '');
-  refreshSheetValues();
+  if (cellRaw(row, col) !== '') {
+    recordSheetHistory();
+    activeDoc().cells[row][col] = '';
+    persist();
+  }
+  const input = sheetWrap.querySelector(`input.grid-cell[data-row="${row}"][data-col="${col}"]`);
+  if (input) { input.value = ''; input.dataset.edited = 'false'; }
   updateSheetFormulaBar();
   setStatus(`Cut ${selectedCellAddress()}`);
 }
@@ -207,10 +221,14 @@ function pasteIntoSelectedSheetCell(event) {
       throw new RangeError('The paste would exceed the 250,000-cell workbook limit.');
     }
     recordSheetHistory();
+    const activeInput = document.activeElement;
+    if (activeInput?.classList?.contains('grid-cell')) activeInput.dataset.edited = 'false';
     activeDoc().cells = nextCells;
     persist();
     renderSheet();
     renderToolbar();
+    const targetInput = sheetWrap.querySelector(`input.grid-cell[data-row="${row}"][data-col="${col}"]`);
+    targetInput?.focus({ preventScroll: true });
     const columns = clipboardGrid.reduce((maximum, line) => Math.max(maximum, line.length), 0);
     setStatus(`Pasted ${clipboardGrid.length} rows × ${columns} columns at ${sheetNavigation.formatCellAddress(row, col)}`);
   } catch (error) {
