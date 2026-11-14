@@ -661,6 +661,47 @@ test('XLSX imports apply Brightdesk table colours even when the source only cont
 });
 
 
+
+test('XLSX export preserves zero-padded identifiers and high-precision numbers as text', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-identifiers-'));
+  const filePath = path.join(directory, 'identifiers.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Identifiers',
+    activeWorksheetId: 'identifiers',
+    worksheets: [{
+      id: 'identifiers',
+      name: 'Identifiers',
+      cells: [
+        ['Code', 'Reference', '', 'Plain code', 'Plain reference'],
+        ['00123', '12345678901234567', '', '00456', '12345678901234568']
+      ],
+      tables: [{
+        id: 'table-1',
+        name: 'IdentifierTable',
+        range: { top: 0, left: 0, bottom: 1, right: 1 },
+        columns: ['Code', 'Reference'],
+        headerRow: true,
+        totalsRow: false,
+        style: 'brightdesk-green'
+      }]
+    }]
+  };
+
+  try {
+    await exportOfficeFile(payload, filePath);
+    const reopened = await openOfficeFile(filePath);
+    const cells = reopened.worksheets[0].cells;
+    assert.equal(cells[1][0], '00123');
+    assert.equal(cells[1][1], '12345678901234567');
+    assert.equal(cells[1][3], '00456');
+    assert.equal(cells[1][4], '12345678901234568');
+    assert.equal(reopened.worksheets[0].tables[0].name, 'IdentifierTable');
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('XLSX round trip keeps table column names in sync after a header cell edit', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-edited-table-header-'));
   const filePath = path.join(directory, 'edited-header.xlsx');
