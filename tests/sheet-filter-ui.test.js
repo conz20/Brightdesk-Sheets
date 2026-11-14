@@ -77,3 +77,11 @@ test('cut operations restore a visible selection after filtered rows are recalcu
   const handler = app.slice(app.indexOf('function cutSelectedSheetCell'), app.indexOf('function pasteIntoSelectedSheetCell'));
   assert.ok(handler.includes('keepSelectedSheetCellVisible'));
 });
+
+
+test('closing, applying or clearing a column filter restores focus to its header trigger', () => {
+  const app = read('src/app.js');
+  assert.ok(app.includes('function focusSheetFilterTrigger(column)'));
+  assert.ok(app.includes("filterButton.dataset.column = String(c)"));
+  assert.ok(app.includes('focusSheetFilterTrigger(column)'));
+});
