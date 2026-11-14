@@ -114,6 +114,9 @@ function normalizeWorkbook(document, fallbackCells = createEmptyGrid()) {
   const sourceSheets = Array.isArray(source.worksheets) && source.worksheets.length
     ? source.worksheets
     : [{ id: 'sheet-1', name: 'Sheet1', cells: source.cells || fallbackCells }];
+  if (sourceSheets.length > MAX_WORKSHEETS) {
+    throw new RangeError(`A workbook cannot contain more than ${MAX_WORKSHEETS} worksheets.`);
+  }
   const requestedActiveId = typeof source.activeWorksheetId === 'string' ? source.activeWorksheetId : '';
   const requestedActiveIndex = sourceSheets.findIndex(sheet => sheet?.id === requestedActiveId);
   const activeStyleIndex = requestedActiveIndex >= 0 ? requestedActiveIndex : 0;
