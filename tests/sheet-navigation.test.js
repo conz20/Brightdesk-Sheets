@@ -108,3 +108,33 @@ test('does not claim worksheet shortcuts without the required modifier', () => {
   assert.equal(getWorksheetShortcutAction({ key: 'F11' }), null);
   assert.equal(getWorksheetShortcutAction({ key: 'F2', ctrlKey: true }), null);
 });
+
+test('adds a row without exceeding the worksheet cell budget', () => {
+  const { appendSheetRow } = require('../src/sheet-navigation');
+  const source = [['A', 'B'], ['C', 'D']];
+  const result = appendSheetRow(source);
+  assert.deepEqual(result, [['A', 'B'], ['C', 'D'], Array(12).fill('')]);
+  assert.deepEqual(source, [['A', 'B'], ['C', 'D']]);
+});
+
+test('adds a column while normalizing ragged rows and keeping values', () => {
+  const { appendSheetColumn } = require('../src/sheet-navigation');
+  const source = [['A', 'B'], ['C']];
+  const result = appendSheetColumn(source);
+  assert.deepEqual(result, [['A', 'B', ''], ['C', '', '']]);
+  assert.deepEqual(source, [['A', 'B'], ['C']]);
+});
+
+test('rejects row or column additions that would exceed the 250,000-cell limit', () => {
+  const { appendSheetRow, appendSheetColumn } = require('../src/sheet-navigation');
+  const wide = Array.from({ length: 250 }, () => Array(1000).fill(''));
+  assert.throws(() => appendSheetRow(wide), /250,000-cell limit/i);
+  const tall = Array.from({ length: 250 }, () => Array(1000).fill(''));
+  assert.throws(() => appendSheetColumn(tall), /250,000-cell limit/i);
+});
+
+test('rejects additions beyond the Excel worksheet dimension limits', () => {
+  const { appendSheetRow, appendSheetColumn } = require('../src/sheet-navigation');
+  const manyColumns = Array.from({ length: 1 }, () => Array(16384).fill(''));
+  assert.throws(() => appendSheetColumn(manyColumns), /column limit/i);
+});
