@@ -179,6 +179,8 @@
     function getRange(reference) {
       const parsed = parseRange(reference);
       if (!parsed) {
+        const constant = numericCellValue(reference);
+        if (constant !== null) return [constant];
         const value = getRef(reference);
         if (typeof value === 'string' && value.startsWith('#')) {
           throw new Error('Referenced cell contains an error');
