@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { cleanFileName, parseCsv, parseTsv, ensureExtension, exportOfficeFile, openOfficeFile, validateProject, assertSheetDimensions } = require('../src/file-service');
+const { createWorkbookTable } = require('../src/sheet-tables');
 
 test('cleanFileName removes unsafe characters and limits length', () => {
   assert.equal(cleanFileName('budget: 2026/report?'), 'budget_ 2026_report_');
@@ -496,6 +497,79 @@ test('XLSX round trip retains named Excel tables with data rows and Brightdesk t
     assert.deepEqual(imported.worksheets[0].cells, payload.worksheets[0].cells);
     assert.equal(imported.tables[0].name, 'SalesTable');
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+
+test('created worksheet tables retain Brightdesk cell styling through XLSX and project-file round trips', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-table-format-roundtrip-'));
+  const xlsxPath = path.join(directory, 'sales.xlsx');
+  const projectPath = path.join(directory, 'sales.bdesk');
+  const cells = [['Product', 'Amount'], ['Pen', 10], ['Paper', 20]];
+  const workbook = {
+    title: 'Sales',
+    activeWorksheetId: 'sales',
+    cells,
+    styles: { B2: { numberFormat: 'currency' } },
+    tables: [],
+    worksheets: [{
+      id: 'sales',
+      name: 'Sales',
+      cells,
+      styles: { B2: { numberFormat: 'currency' } },
+      tables: []
+    }]
+  };
+
+  try {
+    const created = createWorkbookTable(workbook, {
+      top: 0, left: 0, bottom: 2, right: 1
+    }, 'SalesTable');
+    assert.equal(created.name, 'SalesTable');
+
+    const sheet = workbook.worksheets[0];
+    const project = {
+      title: 'Sales',
+      docs: {
+        sheets: {
+          title: 'Sales',
+          activeWorksheetId: workbook.activeWorksheetId,
+          cells: workbook.cells,
+          styles: workbook.styles,
+          tables: workbook.tables,
+          worksheets: workbook.worksheets
+        }
+      }
+    };
+
+    await exportOfficeFile({ project }, projectPath);
+    const reopenedProject = await openOfficeFile(projectPath);
+    assert.deepEqual(reopenedProject, project);
+    assert.equal(reopenedProject.docs.sheets.worksheets[0].tables[0].name, 'SalesTable');
+    assert.equal(reopenedProject.docs.sheets.worksheets[0].styles.A1.fill, '#27845C');
+    assert.equal(reopenedProject.docs.sheets.worksheets[0].styles.A2.fill, '#EDF7F1');
+
+    await exportOfficeFile({
+      kind: 'sheets',
+      title: workbook.title,
+      activeWorksheetId: workbook.activeWorksheetId,
+      cells: workbook.cells,
+      styles: workbook.styles,
+      tables: workbook.tables,
+      worksheets: workbook.worksheets
+    }, xlsxPath);
+
+    const reopenedXlsx = await openOfficeFile(xlsxPath);
+    assert.equal(reopenedXlsx.activeWorksheetId, 'sheet-1');
+    assert.equal(reopenedXlsx.worksheets[0].tables[0].name, 'SalesTable');
+    assert.deepEqual(reopenedXlsx.worksheets[0].cells, cells);
+    assert.equal(reopenedXlsx.worksheets[0].styles.A1.fill, '#27845C');
+    assert.equal(reopenedXlsx.worksheets[0].styles.A1.color, '#FFFFFF');
+    assert.equal(reopenedXlsx.worksheets[0].styles.A1.bold, true);
+    assert.equal(reopenedXlsx.worksheets[0].styles.A2.fill, '#EDF7F1');
+    assert.equal(reopenedXlsx.worksheets[0].styles.B2.numberFormat, 'currency');
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('XLSX import preserves separate named tables across worksheets', async () => {
