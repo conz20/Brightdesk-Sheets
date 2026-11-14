@@ -104,3 +104,43 @@ test('undo and redo restore edited table column names together with header cells
   assert.deepEqual(reapplied.tables[0].columns, ['Product', 'Revenue']);
   assert.deepEqual(reapplied.worksheets[0].tables[0].columns, ['Product', 'Revenue']);
 });
+
+
+test('undo and redo restore worksheet renames together with every updated formula reference', () => {
+  const { normalizeWorkbook, renameWorksheet } = require('../src/workbook-model');
+  const { calculateCell } = require('../src/formula');
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'summary',
+    worksheets: [
+      { id: 'revenue', name: 'Revenue', cells: [['10', '20']] },
+      { id: 'summary', name: 'Summary', cells: [[
+        '=Revenue!A1+Revenue!B1',
+        '=SUM(Revenue!A1:B1)'
+      ]] }
+    ]
+  });
+  const history = createHistory();
+
+  capture(history, workbook);
+  renameWorksheet(workbook, 'revenue', 'Q4 Revenue');
+  assert.equal(workbook.worksheets[0].name, 'Q4 Revenue');
+  assert.equal(workbook.worksheets[1].cells[0][0], "='Q4 Revenue'!A1+'Q4 Revenue'!B1");
+
+  const undone = undo(history, workbook);
+  assert.equal(undone.worksheets[0].name, 'Revenue');
+  assert.equal(undone.worksheets[1].cells[0][0], '=Revenue!A1+Revenue!B1');
+
+  const restored = normalizeWorkbook(undone);
+  const context = { worksheets: restored.worksheets, activeWorksheetId: 'summary' };
+  assert.equal(calculateCell(restored.cells, 0, 0, new Set(), context), 30);
+  assert.equal(calculateCell(restored.cells, 0, 1, new Set(), context), 30);
+
+  const redone = redo(history, undone);
+  assert.equal(redone.worksheets[0].name, 'Q4 Revenue');
+  assert.equal(redone.worksheets[1].cells[0][0], "='Q4 Revenue'!A1+'Q4 Revenue'!B1");
+
+  const reapplied = normalizeWorkbook(redone);
+  const redoContext = { worksheets: reapplied.worksheets, activeWorksheetId: 'summary' };
+  assert.equal(calculateCell(reapplied.cells, 0, 0, new Set(), redoContext), 30);
+  assert.equal(calculateCell(reapplied.cells, 0, 1, new Set(), redoContext), 30);
+});
