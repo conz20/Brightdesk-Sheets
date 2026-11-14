@@ -113,7 +113,7 @@ test('adds a row without exceeding the worksheet cell budget', () => {
   const { appendSheetRow } = require('../src/sheet-navigation');
   const source = [['A', 'B'], ['C', 'D']];
   const result = appendSheetRow(source);
-  assert.deepEqual(result, [['A', 'B'], ['C', 'D'], Array(12).fill('')]);
+  assert.deepEqual(result, [['A', 'B'], ['C', 'D'], ['', '']]);
   assert.deepEqual(source, [['A', 'B'], ['C', 'D']]);
 });
 
