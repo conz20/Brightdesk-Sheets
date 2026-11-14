@@ -727,6 +727,34 @@ test('XLSX export preserves hexadecimal and binary-looking text values', async (
   }
 });
 
+
+test('XLSX export counts significant digits without counting exponent digits', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-exponent-'));
+  const filePath = path.join(directory, 'scientific-values.xlsx');
+  const fifteenDigits = '1.23456789012345e+100';
+  const sixteenDigits = '1.234567890123456e+100';
+  const payload = {
+    kind: 'sheets',
+    title: 'Scientific values',
+    worksheets: [{
+      id: 'scientific',
+      name: 'Scientific',
+      cells: [['Fifteen digits', 'Sixteen digits'], [fifteenDigits, sixteenDigits]]
+    }]
+  };
+
+  try {
+    await exportOfficeFile(payload, filePath);
+    const reopened = await openOfficeFile(filePath);
+    const row = reopened.worksheets[0].cells[1];
+    assert.equal(typeof row[0], 'number');
+    assert.equal(row[0], Number(fifteenDigits));
+    assert.equal(row[1], sixteenDigits);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('XLSX round trip keeps table column names in sync after a header cell edit', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-edited-table-header-'));
   const filePath = path.join(directory, 'edited-header.xlsx');
