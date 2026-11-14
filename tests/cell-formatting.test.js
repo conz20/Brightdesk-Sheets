@@ -55,3 +55,30 @@ test('updates one cell style without mutating other cells', () => {
 test('removes a cell style when all formatting is reset', () => {
   assert.deepEqual(removeCellStyle({ A1: { bold: true } }, 'A1'), {});
 });
+
+test('applies formatting to every cell in a selected rectangular range', () => {
+  const styles = updateCellStylesInRange({ C3: { italic: true } }, {
+    top: 0, left: 0, bottom: 1, right: 1
+  }, { bold: true, fill: '#EDF7F1' });
+
+  assert.equal(styles.A1.bold, true);
+  assert.equal(styles.B1.bold, true);
+  assert.equal(styles.A2.bold, true);
+  assert.equal(styles.B2.bold, true);
+  assert.equal(styles.C3.italic, true);
+  assert.equal(styles.C3.bold, undefined);
+});
+
+test('clears formatting only inside the selected rectangular range', () => {
+  const styles = removeCellStylesInRange({
+    A1: { bold: true }, B1: { italic: true }, C1: { underline: true }
+  }, { top: 0, left: 0, bottom: 0, right: 1 });
+
+  assert.deepEqual(styles, { C1: { underline: true } });
+});
+
+test('rejects style ranges that exceed the worksheet cell limit', () => {
+  assert.throws(() => updateCellStylesInRange({}, {
+    top: 0, left: 0, bottom: 500, right: 500
+  }, { bold: true }), /250,000-cell limit/i);
+});
