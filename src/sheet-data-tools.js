@@ -149,23 +149,26 @@
     return indexes;
   }
 
-  function translateFormulaRow(value, sourceRow, targetRow, worksheetName) {
+  function translateFormulaRow(value, destinationBySourceRow, worksheetName, headerRow = 0) {
     const formula = String(value ?? '');
-    if (!formula.startsWith('=') || sourceRow === targetRow) return formula;
-    const delta = targetRow - sourceRow;
+    if (!formula.startsWith('=') || !(destinationBySourceRow instanceof Map)) return formula;
     return formula.replace(formulaReferencePattern,
       (match, quotedSheet, plainSheet, crossColumn, crossRow, localColumn, localRow) => {
-        const explicitSheet = quotedSheet
+        const explicitSheet = quotedSheet !== undefined
           ? quotedSheet.replace(/''/g, "'")
           : plainSheet;
-        if (explicitSheet && (!worksheetName || explicitSheet.toLocaleLowerCase() !== String(worksheetName).toLocaleLowerCase())) {
+        if (explicitSheet &&
+            (!worksheetName || explicitSheet.toLocaleLowerCase() !== String(worksheetName).toLocaleLowerCase())) {
           return match;
         }
         const column = crossColumn || localColumn;
-        const row = Number(crossRow || localRow);
-        const shifted = row + delta;
-        if (shifted < 1 || shifted > MAX_ROWS) return match;
-        return explicitSheet ? match.replace(new RegExp('!' + column + row + '$', 'i'), '!' + column + shifted) : column + shifted;
+        const sourceRow = Number(crossRow || localRow) - 1;
+        if (sourceRow <= headerRow || !destinationBySourceRow.has(sourceRow)) return match;
+        const targetRow = destinationBySourceRow.get(sourceRow);
+        const targetAddress = column + (targetRow + 1);
+        if (quotedSheet !== undefined) return "'" + quotedSheet + "'!" + targetAddress;
+        if (plainSheet) return plainSheet + '!' + targetAddress;
+        return targetAddress;
       });
   }
 
@@ -203,10 +206,12 @@
     const nextCells = cells.slice(0, headerRow + 1).map(row => row.slice());
     const destinationBySourceRow = new Map();
     sorted.forEach((entry, index) => {
-      const targetRow = headerRow + 1 + index;
-      destinationBySourceRow.set(entry.sourceRow, targetRow);
+      destinationBySourceRow.set(entry.sourceRow, headerRow + 1 + index);
+    });
+    sorted.forEach(entry => {
+      const targetRow = destinationBySourceRow.get(entry.sourceRow);
       nextCells.push(entry.row.map(value => typeof value === 'string'
-        ? translateFormulaRow(value, entry.sourceRow, targetRow, options.worksheetName)
+        ? translateFormulaRow(value, destinationBySourceRow, options.worksheetName, headerRow)
         : value));
     });
 
