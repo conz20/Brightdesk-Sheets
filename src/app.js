@@ -265,12 +265,12 @@ function pasteIntoSelectedSheetCell(event) {
     const range = currentSheetRange();
     const row = range.top, col = range.left;
     const activeInput = document.activeElement;
-    if (activeInput?.classList?.contains('grid-cell') && activeInput.dataset.edited === 'true') {
-      const editedRow = Number(activeInput.dataset.row), editedCol = Number(activeInput.dataset.col);
-      activeDoc().cells[editedRow][editedCol] = activeInput.value;
-      activeInput.dataset.edited = 'false';
-    }
-    const nextCells = sheetClipboard.pasteClipboardGrid(activeDoc().cells, row, col, clipboardGrid);
+    const editedCell = activeInput?.classList?.contains('grid-cell') && activeInput.dataset.edited === 'true'
+      ? { row: Number(activeInput.dataset.row), col: Number(activeInput.dataset.col), value: activeInput.value }
+      : null;
+    const sourceCells = activeDoc().cells.map(line => line.slice());
+    if (editedCell) sourceCells[editedCell.row][editedCell.col] = editedCell.value;
+    const nextCells = sheetClipboard.pasteClipboardGrid(sourceCells, row, col, clipboardGrid);
     const activeId = activeDoc().activeWorksheetId;
     const otherCellCount = activeDoc().worksheets
       .filter(sheet => sheet.id !== activeId)
@@ -279,7 +279,9 @@ function pasteIntoSelectedSheetCell(event) {
     if (otherCellCount + nextCellCount > sheetNavigation.MAX_SHEET_CELLS) {
       throw new RangeError('The paste would exceed the 250,000-cell workbook limit.');
     }
+    if (editedCell) activeDoc().cells[editedCell.row][editedCell.col] = editedCell.value;
     recordSheetHistory();
+    if (editedCell) activeInput.dataset.edited = 'false';
     activeDoc().cells = nextCells;
     persist();
     renderSheet();
