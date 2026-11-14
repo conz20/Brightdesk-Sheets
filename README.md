@@ -13,6 +13,10 @@
 
 Brightdesk Sheets is a dedicated desktop application within the independent Brightdesk Office Suite. It uses the shared Brightdesk design language and opens directly into Sheets.
 
+## Engineering and release standard
+
+This product follows the shared requirements for testing, languages, cross-platform installers, data preservation, customer-controlled updates and ongoing maintenance. See the [engineering and release standard](docs/ENGINEERING_AND_RELEASE_STANDARD.md).
+
 ## Shared Brightdesk design standard
 
 This product follows the [Brightdesk visual and interaction standard](https://github.com/connormolloy12/Brightdesk-suite/blob/main/docs/BRIGHTDESK_VISUAL_STANDARD.md) for branding, icon usage, layout, responsive behaviour and accessibility.
