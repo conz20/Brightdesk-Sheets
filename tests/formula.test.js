@@ -120,3 +120,11 @@ test('single-cell aggregate references propagate formula errors like one-cell ra
   assert.equal(calculateCell(cells, 0, 1), '#VALUE!');
   assert.equal(calculateCell(cells, 0, 2), '#VALUE!');
 });
+
+test('numeric cell values remain available to direct references and aggregate formulas', () => {
+  const cells = [['10', '1.5', '', '=A1+B1', '=SUM(A1:B1)', '=COUNT(A1:B1)']];
+
+  assert.equal(calculateCell(cells, 0, 3), 11.5);
+  assert.equal(calculateCell(cells, 0, 4), 11.5);
+  assert.equal(calculateCell(cells, 0, 5), 2);
+});
