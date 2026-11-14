@@ -133,5 +133,5 @@ test('supports scientific notation constants without confusing exponent digits f
   const cells = [['=1e3 + 2.5e-1', '3', '=A1+1e2']];
 
   assert.equal(calculateCell(cells, 0, 0), 1000.25);
-  assert.equal(calculateCell(cells, 0, 2), 1100);
+  assert.equal(calculateCell(cells, 0, 2), 1100.25);
 });
