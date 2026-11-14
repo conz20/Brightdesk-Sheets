@@ -239,6 +239,42 @@
     return { ...updated, range: { ...updated.range }, columns: updated.columns.slice() };
   }
 
+  function synchronizeWorkbookTableHeaders(workbook) {
+    const context = getWorkbookContext(workbook);
+    const nextCells = cloneCellGrid(context.cells);
+    const nextTables = cloneTableList(context.tables || []);
+    let changed = false;
+
+    for (const table of nextTables) {
+      const range = table?.range;
+      if (table?.headerRow === false || !range ||
+          !Number.isInteger(range.top) || !Number.isInteger(range.left) ||
+          !Number.isInteger(range.right) || range.top < 0 || range.left < 0 ||
+          range.right < range.left || range.top >= nextCells.length ||
+          nextCells[range.top].length <= range.right) {
+        continue;
+      }
+
+      const headers = nextCells[range.top].slice(range.left, range.right + 1);
+      if (headers.length !== table.columns.length) continue;
+      const columns = uniqueColumnNames(headers);
+      columns.forEach((name, index) => {
+        const column = range.left + index;
+        if (nextCells[range.top][column] !== name) {
+          nextCells[range.top][column] = name;
+          changed = true;
+        }
+      });
+      if (columns.some((name, index) => name !== table.columns[index])) {
+        table.columns = columns;
+        changed = true;
+      }
+    }
+
+    if (changed) syncWorkbookTableState(context, nextCells, nextTables, context.styles);
+    return changed;
+  }
+
   function renameWorkbookTable(workbook, tableId, requestedName) {
     const context = getWorkbookContext(workbook);
     const tables = renameTable(context.tables || [], tableId, requestedName, context.otherTables);
@@ -271,6 +307,7 @@
     applyTableStyles,
     createWorkbookTable,
     updateWorkbookTableHeader,
+    synchronizeWorkbookTableHeaders,
     renameWorkbookTable,
     removeWorkbookTable
   };
