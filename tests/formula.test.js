@@ -104,3 +104,12 @@ test('arithmetic and worksheet formulas preserve decimals without a leading zero
   assert.equal(arithmetic('1. + .5'), 1.5);
   assert.equal(calculateCell([['=.5+1']], 0, 0), 1.5);
 });
+
+test('formulas keep hexadecimal and binary-looking cell values as text', () => {
+  const cells = [['0xFF', '0b101', '12', '=A1+1', '=SUM(A1:C1)', '=COUNT(A1:C1)', '=COUNTA(A1:C1)']];
+
+  assert.equal(calculateCell(cells, 0, 3), '#VALUE!');
+  assert.equal(calculateCell(cells, 0, 4), 12);
+  assert.equal(calculateCell(cells, 0, 5), 1);
+  assert.equal(calculateCell(cells, 0, 6), 3);
+});
