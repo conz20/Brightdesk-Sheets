@@ -133,3 +133,7 @@ The migration keeps the existing `brightdesk-docs-v3`, legacy `brightdesk-docs-v
 ## Private CI runner
 
 Pull-request product tests and README checks run on Brightdesk's private macOS ARM64 runner. Routine pull-request verification does not use GitHub-hosted paid runners. Installer matrix builds and release publishing are separate manual workflow actions and are not run by pull-request checks.
+
+## Application identity
+
+The Electron main process validates the configured product ID against the shared ten-product catalogue exported by `src/standalone-downloads.js`. The startup import is covered by `tests/main-product-catalog.test.js`, which guards the approved product list so unsupported IDs cannot enter the product launch path.
