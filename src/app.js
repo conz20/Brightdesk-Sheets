@@ -669,6 +669,7 @@ function clearSheetColumnFilter(column) {
   persist();
   renderSheet();
   renderToolbar();
+  focusSheetFilterTrigger(column);
   setStatus('Filter cleared for column ' + letter(column));
 }
 function applySheetColumnFilter(column) {
@@ -685,6 +686,7 @@ function applySheetColumnFilter(column) {
   persist();
   renderSheet();
   renderToolbar();
+  focusSheetFilterTrigger(column);
   const activeFilters = Object.keys(activeDoc().autoFilter.filters).length;
   const visibleCount = Math.max(0, visibleSheetRowIndexes().length - 1);
   const dataCount = Math.max(0, (activeDoc().cells || []).length - 1);
@@ -708,10 +710,16 @@ function openSheetFilterMenu(column) {
   const search = sheetWrap.querySelector('.sheet-filter-search');
   search?.focus({ preventScroll: true });
 }
+function focusSheetFilterTrigger(column) {
+  const trigger = sheetWrap.querySelector('.sheet-filter-trigger[data-column="' + column + '"]');
+  trigger?.focus({ preventScroll: true });
+}
 function closeSheetFilterMenu() {
+  const column = state.sheetFilterMenuColumn;
   state.sheetFilterMenuColumn = null;
   state.sheetFilterSearch = '';
   renderSheet();
+  if (column !== null) focusSheetFilterTrigger(column);
 }
 function renderSheetFilterMenu(cell, column) {
   if (state.sheetFilterMenuColumn !== column) return;
@@ -1138,6 +1146,7 @@ function renderSheet() {
         filterButton.classList.toggle('has-filter', activeColumnFilter);
         filterButton.textContent = '▾';
         filterButton.title = 'Filter column ' + letter(c);
+        filterButton.dataset.column = String(c);
         filterButton.setAttribute('aria-label', (activeColumnFilter ? 'Edit active filter for column ' : 'Filter column ') + letter(c));
         filterButton.setAttribute('aria-expanded', String(state.sheetFilterMenuColumn === c));
         filterButton.addEventListener('click', event => {
