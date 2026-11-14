@@ -42,7 +42,7 @@ function cloneAutoFilterState(value) {
   let valueCount = 0;
   if (source.filters && typeof source.filters === 'object' && !Array.isArray(source.filters)) {
     for (const [column, rawValues] of Object.entries(source.filters)) {
-      if (!/^(?:0|[1-9]\\d*)$/.test(column) || Number(column) >= 16384 || !Array.isArray(rawValues)) continue;
+      if (!/^(?:0|[1-9]\d*)$/.test(column) || Number(column) >= 16384 || !Array.isArray(rawValues)) continue;
       const values = [];
       const seen = new Set();
       for (const raw of rawValues) {
