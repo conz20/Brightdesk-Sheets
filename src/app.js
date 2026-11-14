@@ -191,8 +191,9 @@ function cutSelectedSheetCell(event) {
 function pasteIntoSelectedSheetCell(event) {
   if (state.app !== 'sheets' || !event.clipboardData) return;
   event.preventDefault();
+  const clipboardTypes = Array.from(event.clipboardData.types || []);
+  if (!clipboardTypes.includes('text/plain')) return;
   const text = event.clipboardData.getData('text/plain');
-  if (!text) return;
   try {
     const clipboardGrid = sheetClipboard.parseClipboardGrid(text);
     const { row, col } = state.selectedCell;
