@@ -117,7 +117,7 @@ function assertAutoFilterState(value) {
   }
   let totalValues = 0;
   for (const [column, values] of Object.entries(value.filters)) {
-    if (!/^(?:0|[1-9]\\d*)$/.test(column) || !Number.isSafeInteger(Number(column)) ||
+    if (!/^(?:0|[1-9]\d*)$/.test(column) || !Number.isSafeInteger(Number(column)) ||
         Number(column) >= 16_384 || !Array.isArray(values)) {
       throw new Error('The Brightdesk Sheets workbook contains invalid worksheet filter settings.');
     }
