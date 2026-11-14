@@ -36,6 +36,27 @@ function cloneCellStyles(styles) {
   return result;
 }
 
+function cloneAutoFilterState(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const filters = {};
+  let valueCount = 0;
+  if (source.filters && typeof source.filters === 'object' && !Array.isArray(source.filters)) {
+    for (const [column, rawValues] of Object.entries(source.filters)) {
+      if (!/^(?:0|[1-9]\\d*)$/.test(column) || Number(column) >= 16384 || !Array.isArray(rawValues)) continue;
+      const values = [];
+      const seen = new Set();
+      for (const raw of rawValues) {
+        if (typeof raw !== 'string' || raw.length > 32767 || seen.has(raw) || valueCount >= 250000) continue;
+        seen.add(raw);
+        values.push(raw);
+        valueCount += 1;
+      }
+      filters[column] = values;
+    }
+  }
+  return { enabled: source.enabled === true, filters };
+}
+
 function makeUniqueName(candidate, usedNames) {
   const base = String(candidate || '').trim().slice(0, 31) || 'Sheet';
   if (!usedNames.has(base.toLocaleLowerCase())) return base;
@@ -73,7 +94,8 @@ function normalizeWorkbook(document, fallbackCells = createEmptyGrid()) {
       id,
       name,
       cells: cloneGrid(sheet?.cells, fallbackCells),
-      styles: cloneCellStyles(sheet?.styles ?? (index === activeStyleIndex ? source.styles : null))
+      styles: cloneCellStyles(sheet?.styles ?? (index === activeStyleIndex ? source.styles : null)),
+      autoFilter: cloneAutoFilterState(sheet?.autoFilter ?? (index === activeStyleIndex ? source.autoFilter : null))
     };
   });
 
@@ -82,6 +104,7 @@ function normalizeWorkbook(document, fallbackCells = createEmptyGrid()) {
   // Keep the legacy `cells` property as the active-sheet view for older readers.
   normalized.cells = cloneGrid(active.cells, fallbackCells);
   normalized.styles = cloneCellStyles(active.styles);
+  normalized.autoFilter = cloneAutoFilterState(active.autoFilter);
   return normalized;
 }
 
@@ -93,6 +116,7 @@ function syncActiveWorksheet(document) {
   if (!active) throw new Error('The active worksheet could not be found.');
   active.cells = cloneGrid(document.cells);
   active.styles = cloneCellStyles(document.styles);
+  active.autoFilter = cloneAutoFilterState(document.autoFilter);
   return document;
 }
 
@@ -103,6 +127,7 @@ function activateWorksheet(document, worksheetId) {
   document.activeWorksheetId = target.id;
   document.cells = cloneGrid(target.cells);
   document.styles = cloneCellStyles(target.styles);
+  document.autoFilter = cloneAutoFilterState(target.autoFilter);
   return document;
 }
 
@@ -114,11 +139,12 @@ function addWorksheet(document, requestedName) {
   const name = makeUniqueName(suggested, usedNames);
   let number = 1;
   while (usedIds.has(`sheet-${number}`)) number += 1;
-  const worksheet = { id: `sheet-${number}`, name, cells: createEmptyGrid(), styles: {} };
+  const worksheet = { id: `sheet-${number}`, name, cells: createEmptyGrid(), styles: {}, autoFilter: cloneAutoFilterState(null) };
   document.worksheets.push(worksheet);
   document.activeWorksheetId = worksheet.id;
   document.cells = cloneGrid(worksheet.cells);
   document.styles = {};
+  document.autoFilter = cloneAutoFilterState(null);
   return document;
 }
 
@@ -148,6 +174,7 @@ function deleteWorksheet(document, worksheetId) {
     document.activeWorksheetId = next.id;
     document.cells = cloneGrid(next.cells);
     document.styles = cloneCellStyles(next.styles);
+    document.autoFilter = cloneAutoFilterState(next.autoFilter);
   }
   return document;
 }
@@ -168,6 +195,7 @@ return {
   DEFAULT_COLUMN_COUNT,
   createEmptyGrid,
   cloneCellStyles,
+  cloneAutoFilterState,
   normalizeWorkbook,
   syncActiveWorksheet,
   activateWorksheet,
