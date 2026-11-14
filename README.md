@@ -48,7 +48,7 @@ These are configured build targets, not confirmation that a package has passed i
 ## Current first-use workflows
 
 - Edit values in a spreadsheet grid and use the formula bar.
-- Work across named worksheets: add, switch, rename, reorder and delete tabs. The final worksheet cannot be deleted.
+- Work across named worksheets: add, switch, rename, reorder and delete tabs. The final worksheet cannot be deleted. Renaming a worksheet also updates supported formulas that refer to its old name, including quoted sheet names and ranges.
 - Navigate directly to a cell with the Name Box, edit its raw value or formula in a dedicated formula bar, and adjust worksheet zoom from the status bar.
 - Shift-click to select a rectangular range of cells. Format the selected cell or range as bold, italic or underlined; choose a safe text/fill colour; and display numbers as Number, Currency (AUD), Percentage or Date. Formatting is kept separately for each worksheet.
 - Use Fill Down or Fill Right on a selected range to repeat the first row or column. Supported relative cell and range references move with the filled formula.
