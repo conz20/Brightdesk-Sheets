@@ -5,12 +5,29 @@
 ## Reference reviewed
 
 - Project: [Storytold GridCraft](https://github.com/storytold/gridcraft)
-- Reference version: public `main` branch inspected on 7 November 2026
-- Project description: open-source spreadsheet implemented in Rust
-- Published licence: MIT OR Apache-2.0
+- Reference snapshot: public `main` at commit `c0ee120ac2d9b59630f5abf1151dd9b471fe2926`, committed 12 November 2026; GitHub reported the repository pushed on 13 November and updated on 14 November 2026.
+- Upstream Cargo workspace version: `0.19.1`; Rust edition `2024`; declared minimum Rust version `1.95`.
+- Upstream workspace licence expression: MIT OR Apache-2.0, with both licence files present.
 - Relevant reference material: [README](https://github.com/storytold/gridcraft/blob/main/README.md), [roadmap](https://github.com/storytold/gridcraft/blob/main/ROADMAP.md), [architecture](https://github.com/storytold/gridcraft/blob/main/Cargo.toml), and the public crate layout.
 
 This review uses public feature descriptions and architecture as product research. Brightdesk Sheets remains an independent implementation with its own source, interface, product identity, icons and artwork. No GridCraft source code, ArtCraft branding, screenshots, sample workbooks or assets are copied by this document.
+
+## Current upstream snapshot and documentation freshness
+
+The current upstream README describes a much broader spreadsheet surface than the earlier 7 November review:
+
+- A familiar ribbon, formula bar, Name Box, sheet tabs, fill handle, Format Cells, conditional formatting and dark mode.
+- AutoFilter, sorting, structured tables, table references, totals rows, data validation, Flash Fill, outlining and subtotals.
+- A formula engine advertised with more than 500 functions, dynamic arrays/spilling, LET/LAMBDA and related higher-order functions.
+- Charts and sparklines, PivotTables, cell pictures, comments, page-break preview, printing and PDF.
+- XLSX as its native workbook format, plus CSV/TSV; documented partial import paths for legacy XLS, XLSB and ODS.
+- CLI, MCP and a JSON control channel for automation.
+
+**Do not treat those README descriptions as proof that every capability is complete or compatible with Excel.** The same current README still labels GridCraft alpha and says compatibility and implementation depth remain rough. Its own published summary estimates about 50% readiness for real work and approximately 160–240 hours to beta; these are upstream estimates, not Brightdesk targets.
+
+The documentation is not all equally fresh: the upstream roadmap identifies itself as last updated 5 November 2026, and docs/gaps.md identifies itself as last updated 2 November 2026. The repository main branch moved after those dates. Use the current README and exact current source for product-scope research, but treat the older roadmap/gap estimates as dated context rather than a live list of current defects. Re-check the source before using any individual capability as an implementation specification.
+
+GridCraft's Rust 2024 workspace, Rust 1.95 MSRV and 0.19.1 version are metadata of the reference project only. Brightdesk remains on its own approved Node.js 24.22.2 / Electron 45.2.1 / electron-builder 26.18.0 toolchain and current mixed-language architecture. Do not copy GridCraft's Rust architecture, code, dependency choices or brand assets into Brightdesk.
 
 ## What the reference demonstrates
 
@@ -75,13 +92,14 @@ The implementation includes unit and integration-focused regression tests, but t
 | P1 | Row/column operations, fill, copy/paste, sort and filter | Boundary, selection, clipboard and undo/redo tests |
 | P1 | Cell formatting, number/date formats and reusable styles | Display/edit separation and save/reopen tests |
 | P2 | XLSX and CSV compatibility with explicit loss reporting | Real-world workbook corpus and round-trip comparison |
-| P2 | Multiple sheets, named ranges, tables and data validation | Cross-sheet and malformed-reference regression tests |
-| P3 | Formula dependency graph and incremental recalculation | Recalculation correctness and performance benchmarks |
-| P3 | Charts, conditional formatting, sparklines and print/PDF | Visual fixtures, data binding and export tests |
+| P2 | Named ranges, structured tables, totals rows and data validation | Table-name/reference tests, validation-rule boundary tests, local save/reopen and XLSX round trips |
+| P2 | XLSX and CSV compatibility with explicit loss reporting | Real-world workbook corpus, format-feature matrix and round-trip comparison |
+| P3 | Formula dependency graph and incremental recalculation | Recalculation correctness, dependency-invalidation tests and performance benchmarks |
+| P3 | Charts, conditional formatting, sparklines and print/PDF | Visual fixtures, data binding, accessible editing and export tests |
 | P4 | Pivot tables, what-if analysis and advanced data import | Feature-specific correctness suites and documented limitations |
 | P4 | Scripting/automation interface with safe local permissions | Contract tests, sandboxed file access and audit logs |
 
-Priorities are proposed, not a promise that every feature will be included in the first release. Each increment must be sized against the existing code and the user's intended workflow.
+Multiple worksheets and the first sort/filter foundation are already being developed in draft PR #35; they are not accepted until exact-head tests and desktop verification pass. The next product-value increment after that is structured tables and data validation, not attempting to reproduce every high-end GridCraft/Excel feature at once. Priorities are proposed, not a promise that every feature will be included in the first release. Each increment must be sized against the existing code and the user's intended workflow.
 
 ## Brightdesk implementation principles
 
