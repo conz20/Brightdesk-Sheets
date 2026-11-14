@@ -624,3 +624,38 @@ test('Brightdesk project files preserve named tables independently across worksh
     assert.deepEqual(await openOfficeFile(filePath), project);
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+
+
+test('XLSX imports apply Brightdesk table colours even when the source only contains an Excel table style', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-external-table-style-'));
+  const filePath = path.join(directory, 'external-table.xlsx');
+  const ExcelJS = require('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Inventory');
+  sheet.addTable({
+    name: 'InventoryTable',
+    ref: 'A1:B3',
+    headerRow: true,
+    totalsRow: false,
+    style: { theme: 'TableStyleMedium2', showRowStripes: true },
+    columns: [{ name: 'Item' }, { name: 'Quantity' }],
+    rows: [['Paper', 12], ['Pens', 8]]
+  });
+
+  try {
+    await workbook.xlsx.writeFile(filePath);
+    const imported = await openOfficeFile(filePath);
+    const worksheet = imported.worksheets[0];
+
+    assert.equal(worksheet.tables[0].name, 'InventoryTable');
+    assert.deepEqual(worksheet.cells, [['Item', 'Quantity'], ['Paper', 12], ['Pens', 8]]);
+    assert.equal(worksheet.styles.A1.fill, '#27845C');
+    assert.equal(worksheet.styles.A1.color, '#FFFFFF');
+    assert.equal(worksheet.styles.A1.bold, true);
+    assert.equal(worksheet.styles.A2.fill, '#EDF7F1');
+    assert.equal(worksheet.styles.A3.fill, null);
+    assert.equal(worksheet.tables[0].style, 'brightdesk-green');
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
