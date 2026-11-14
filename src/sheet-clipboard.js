@@ -39,7 +39,7 @@
 
     for (let index = 0; index < input.length; index += 1) {
       const character = input[index];
-      const isNewline = character === '\\n' || character === '\\r';
+      const isNewline = character === '\n' || character === '\r';
 
       if (quoted) {
         if (character === '"') {
@@ -57,12 +57,12 @@
       }
 
       if (quoteClosed) {
-        if (character === '\\t') {
+        if (character === '\t') {
           pushCell();
           continue;
         }
         if (isNewline) {
-          if (character === '\\r' && input[index + 1] === '\\n') index += 1;
+          if (character === '\r' && input[index + 1] === '\n') index += 1;
           pushRow();
           continue;
         }
@@ -73,10 +73,10 @@
         if (fieldStarted) throw new Error('Clipboard contents contain invalid quotation marks.');
         quoted = true;
         fieldStarted = true;
-      } else if (character === '\\t') {
+      } else if (character === '\t') {
         pushCell();
       } else if (isNewline) {
-        if (character === '\\r' && input[index + 1] === '\\n') index += 1;
+        if (character === '\r' && input[index + 1] === '\n') index += 1;
         pushRow();
       } else {
         cell += character;
@@ -98,8 +98,8 @@
     }
     return grid.map(row => row.map(value => {
       const text = String(value ?? '');
-      return /["\\t\\r\\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
-    }).join('\\t')).join('\\r\\n');
+      return /["\t\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    }).join('\t')).join('\r\n');
   }
 
   function pasteClipboardGrid(cells, startRow, startCol, clipboardGrid, maxCells = MAX_CLIPBOARD_CELLS) {
