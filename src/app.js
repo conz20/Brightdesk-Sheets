@@ -45,10 +45,12 @@ const commonJsonStorage = window.BrightdeskCommonLibs;
 const workbookModel = window.BrightdeskWorkbookModel;
 const sheetNavigation = window.BrightdeskSheetNavigation;
 const sheetHistory = window.BrightdeskSheetHistory;
+const cellFormatting = window.BrightdeskCellFormatting;
 if (!commonJsonStorage) throw new Error('Brightdesk common storage helper was not loaded.');
 if (!workbookModel) throw new Error('Brightdesk worksheet model was not loaded.');
 if (!sheetNavigation) throw new Error('Brightdesk sheet navigation helpers were not loaded.');
 if (!sheetHistory) throw new Error('Brightdesk sheet history helpers were not loaded.');
+if (!cellFormatting) throw new Error('Brightdesk cell formatting helpers were not loaded.');
 const workbookHistory = sheetHistory.createHistory({ limit: 100, clone });
 
 function clone(value) { return commonJsonStorage.cloneJsonValue(value); }
@@ -141,6 +143,62 @@ function cellNumeric(row, col) {
   });
 }
 function colIndex(label) { return window.BrightdeskFormula.columnIndex(label); }
+function selectedCellAddress() {
+  return sheetNavigation.formatCellAddress(state.selectedCell.row, state.selectedCell.col);
+}
+function selectedCellStyle() {
+  return cellFormatting.normalizeCellStyle(activeDoc().styles?.[selectedCellAddress()]);
+}
+function formattedCellValue(row, col) {
+  const address = sheetNavigation.formatCellAddress(row, col);
+  return cellFormatting.formatCellDisplay(String(cellNumeric(row, col) ?? ''), activeDoc().styles?.[address]);
+}
+function applyCellVisualStyle(input, row, col) {
+  const address = sheetNavigation.formatCellAddress(row, col);
+  const style = cellFormatting.normalizeCellStyle(activeDoc().styles?.[address]);
+  input.style.fontWeight = style.bold ? '700' : '';
+  input.style.fontStyle = style.italic ? 'italic' : '';
+  input.style.textDecoration = style.underline ? 'underline' : '';
+  input.style.backgroundColor = style.fill || '';
+  input.style.color = style.color || '';
+}
+function applySelectedCellStyle(changes) {
+  const address = selectedCellAddress();
+  recordSheetHistory();
+  activeDoc().styles = cellFormatting.updateCellStyle(activeDoc().styles || {}, address, changes);
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus(`Formatting applied to ${address}`);
+}
+function clearSelectedCellStyle() {
+  const address = selectedCellAddress();
+  if (!activeDoc().styles?.[address]) return;
+  recordSheetHistory();
+  activeDoc().styles = cellFormatting.removeCellStyle(activeDoc().styles || {}, address);
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus(`Formatting cleared from ${address}`);
+}
+function addCellStyleSelect(container, labelText, options, value, onChange) {
+  const wrapper = document.createElement('label');
+  wrapper.className = 'sheet-format-control';
+  wrapper.textContent = labelText;
+  const select = document.createElement('select');
+  select.setAttribute('aria-label', labelText);
+  options.forEach(([optionValue, optionLabel]) => {
+    const option = document.createElement('option');
+    option.value = optionValue;
+    option.textContent = optionLabel;
+    select.append(option);
+  });
+  select.value = value;
+  select.addEventListener('change', () => onChange(select.value));
+  wrapper.append(select);
+  container.append(wrapper);
+  return select;
+}
 function updateSheetFormulaBar() {
   if (state.app !== 'sheets') return;
   const nameBox = $('sheet-name-box');
@@ -258,6 +316,23 @@ function renderToolbar() {
   } else if (app === 'sheets') {
     if (tab === 'home') {
       const grid = group('cells'); addButton(grid, `+ ${label('row')}`, () => addSheetRow()); addButton(grid, `+ ${label('column')}`, () => addSheetColumn());
+      const style = selectedCellStyle();
+      const formatting = ribbonGroup(toolbar, 'Cell formatting');
+      for (const [caption, property] of [['B', 'bold'], ['I', 'italic'], ['U', 'underline']]) {
+        const button = addButton(formatting, caption, () => applySelectedCellStyle({ [property]: !selectedCellStyle()[property] }), property[0].toUpperCase() + property.slice(1));
+        button.setAttribute('aria-pressed', String(style[property]));
+        button.classList.toggle('active', style[property]);
+      }
+      addCellStyleSelect(formatting, 'Fill', [
+        ['', 'None'], ['#EDF7F1', 'Soft green'], ['#FFF4CE', 'Soft yellow'], ['#F1F3F5', 'Light grey']
+      ], style.fill || '', value => applySelectedCellStyle({ fill: value || null }));
+      addCellStyleSelect(formatting, 'Text', [
+        ['', 'Default'], ['#1E6847', 'Dark green'], ['#24334B', 'Navy'], ['#8A3434', 'Dark red']
+      ], style.color || '', value => applySelectedCellStyle({ color: value || null }));
+      addCellStyleSelect(formatting, 'Number', [
+        ['general', 'General'], ['number', 'Number'], ['currency', 'Currency (AUD)'], ['percent', 'Percentage'], ['date', 'Date']
+      ], style.numberFormat, value => applySelectedCellStyle({ numberFormat: value }));
+      addButton(formatting, 'Clear format', clearSelectedCellStyle, 'Clear formatting on the selected cell');
       const editing = group('editing');
       addButton(editing, 'Undo', () => applySheetHistory('undo'), 'Undo the last spreadsheet change');
       addButton(editing, 'Redo', () => applySheetHistory('redo'), 'Redo the last undone spreadsheet change');
@@ -456,7 +531,8 @@ function refreshSheetValues() {
   sheetWrap.querySelectorAll('input.grid-cell').forEach(input => {
     if (document.activeElement === input) return;
     const row = Number(input.dataset.row), col = Number(input.dataset.col);
-    input.value = String(cellNumeric(row, col));
+    input.value = formattedCellValue(row, col);
+    applyCellVisualStyle(input, row, col);
   });
   updateSheetFormulaBar();
 }
@@ -516,8 +592,9 @@ function renderSheet() {
   for(let c=0;c<maxCols;c++){const th=document.createElement('th');th.textContent=letter(c);head.append(th);} thead.append(head); table.append(thead);
   const tbody=document.createElement('tbody');
   rows.forEach((row,r)=>{const tr=document.createElement('tr'),th=document.createElement('th');th.textContent=String(r+1);tr.append(th);
-    for(let c=0;c<maxCols;c++){const td=document.createElement('td'),input=document.createElement('input');input.className='grid-cell';input.value=String(cellNumeric(r,c));input.dataset.row=r;input.dataset.col=c;input.setAttribute('aria-label',`${letter(c)}${r+1}`);input.lang=state.proofingLanguage;
-      input.addEventListener('focus',()=>{state.selectedCell={row:r,col:c};renderToolbar();updateSheetFormulaBar();});
+    for(let c=0;c<maxCols;c++){const td=document.createElement('td'),input=document.createElement('input');input.className='grid-cell';input.value=formattedCellValue(r,c);input.dataset.row=r;input.dataset.col=c;input.setAttribute('aria-label',`${letter(c)}${r+1}`);input.lang=state.proofingLanguage;applyCellVisualStyle(input,r,c);
+      input.addEventListener('focus',()=>{state.selectedCell={row:r,col:c};input.value=cellRaw(r,c);renderToolbar();updateSheetFormulaBar();});
+      input.addEventListener('blur',()=>{if(input.dataset.edited!=='true')input.value=formattedCellValue(r,c);});
       input.addEventListener('input',()=>{input.dataset.edited='true';});
       input.addEventListener('change',()=>{if(input.dataset.edited==='true')setCell(r,c,input.value);input.dataset.edited='false';refreshSheetValues();});
       input.addEventListener('keydown',event=>navigateSheetCell(input,event));
