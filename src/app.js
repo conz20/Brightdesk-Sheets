@@ -969,6 +969,13 @@ function navigateSheetCell(input, event) {
     selectionEnd: input.selectionEnd
   });
   if (!target) return false;
+
+  event.preventDefault();
+  if (input.dataset.edited === 'true') {
+    setCell(row, col, input.value);
+    input.dataset.edited = 'false';
+  }
+
   const nextTarget = { ...target };
   const filterState = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter);
   if (filterState.enabled && nextTarget.row !== row) {
@@ -979,18 +986,13 @@ function navigateSheetCell(input, event) {
         ? visibleRows.filter(visibleRow => visibleRow > row)
         : visibleRows.filter(visibleRow => visibleRow < row).reverse();
       if (!candidates.length) {
-        event.preventDefault();
+        keepSelectedSheetCellVisible();
+        renderSheet();
         setStatus('No more visible rows in that direction');
         return true;
       }
       nextTarget.row = candidates[0];
     }
-  }
-
-  event.preventDefault();
-  if (input.dataset.edited === 'true') {
-    setCell(row, col, input.value);
-    input.dataset.edited = 'false';
   }
 
   try {
@@ -1001,10 +1003,10 @@ function navigateSheetCell(input, event) {
   }
 
   resetSheetSelection(nextTarget.row, nextTarget.col);
-  let next = sheetWrap.querySelector(`input.grid-cell[data-row="${target.row}"][data-col="${target.col}"]`);
+  let next = sheetWrap.querySelector('input.grid-cell[data-row="' + nextTarget.row + '"][data-col="' + nextTarget.col + '"]');
   if (!next) {
     renderSheet();
-    next = sheetWrap.querySelector(`input.grid-cell[data-row="${target.row}"][data-col="${target.col}"]`);
+    next = sheetWrap.querySelector('input.grid-cell[data-row="' + nextTarget.row + '"][data-col="' + nextTarget.col + '"]');
   }
   persist();
   renderToolbar();
