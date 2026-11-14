@@ -247,3 +247,59 @@ test('XLSX import and export preserve all worksheet names and values', async () 
     assert.deepEqual(imported.cells, payload.worksheets[1].cells);
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+
+test('Brightdesk project validation accepts safe cell formatting and rejects invalid styles', () => {
+  const valid = {
+    docs: { sheets: {
+      activeWorksheetId: 'one',
+      worksheets: [{ id: 'one', name: 'Overview', cells: [['100']], styles: {
+        A1: { bold: true, italic: false, underline: true, fill: '#EDF7F1', color: '#1E6847', numberFormat: 'currency' }
+      } }]
+    } }
+  };
+  assert.equal(validateProject(valid), valid);
+
+  const invalidStyle = value => ({ docs: { sheets: {
+    activeWorksheetId: 'one',
+    worksheets: [{ id: 'one', name: 'Overview', cells: [['100']], styles: { A1: value } }]
+  } } });
+  assert.throws(() => validateProject(invalidStyle({ fill: 'red' })), /invalid cell formatting/i);
+  assert.throws(() => validateProject(invalidStyle({ color: '#12345' })), /invalid cell formatting/i);
+  assert.throws(() => validateProject(invalidStyle({ numberFormat: 'custom' })), /invalid cell formatting/i);
+  assert.throws(() => validateProject(invalidStyle({ bold: 'yes' })), /invalid cell formatting/i);
+  assert.throws(() => validateProject({
+    docs: { sheets: { activeWorksheetId: 'one', worksheets: [
+      { id: 'one', name: 'Overview', cells: [['100']], styles: { A0: { bold: true } } }
+    ] } }
+  }), /invalid cell address/i);
+});
+
+test('XLSX round trip preserves cell number formats, font, fill and worksheet-specific formatting', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-formatted-xlsx-'));
+  const filePath = path.join(directory, 'formatted-workbook.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Formatted workbook',
+    activeWorksheetId: 'costs',
+    worksheets: [
+      { id: 'sales', name: 'Sales', cells: [['Revenue', '1234.5']], styles: {
+        B1: { bold: true, color: '#1E6847', numberFormat: 'currency' }
+      } },
+      { id: 'costs', name: 'Costs', cells: [['Ratio', '0.25']], styles: {
+        B1: { italic: true, underline: true, fill: '#EDF7F1', numberFormat: 'percent' }
+      } }
+    ]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.deepEqual(imported.worksheets[0].styles.B1, {
+      bold: true, italic: false, underline: false, fill: null, color: '#1E6847', numberFormat: 'currency'
+    });
+    assert.deepEqual(imported.worksheets[1].styles.B1, {
+      bold: false, italic: true, underline: true, fill: '#EDF7F1', color: null, numberFormat: 'percent'
+    });
+    assert.equal(imported.activeWorksheetId, 'sheet-2');
+    assert.deepEqual(imported.styles, imported.worksheets[1].styles);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
