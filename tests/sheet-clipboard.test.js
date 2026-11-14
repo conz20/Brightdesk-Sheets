@@ -51,5 +51,5 @@ test('rejects clipboard pastes that exceed the 250,000-cell worksheet limit', ()
 
 test('rejects invalid destinations and malformed grids', () => {
   assert.throws(() => pasteClipboardGrid([['a']], -1, 0, [['x']]), /valid cell/i);
-  assert.throws(() => pasteClipboardGrid([['a']], 0, 0, [['x'], 'bad']), /valid clipboard grid/i);
+  assert.throws(() => pasteClipboardGrid([['a']], 0, 0, [['x'], 'bad']), /clipboard grid is invalid/i);
 });
