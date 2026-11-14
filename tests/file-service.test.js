@@ -165,3 +165,84 @@ test('CSV and TSV parsers reject malformed quotes and preserve empty quoted cell
     assert.deepEqual(parse('""'), [['']]);
   }
 });
+
+
+test('Brightdesk project validation accepts a valid multi-worksheet workbook', () => {
+  const project = {
+    title: 'Quarterly plan',
+    docs: {
+      sheets: {
+        title: 'Quarterly plan',
+        activeWorksheetId: 'sheet-2',
+        cells: [['Costs', '25']],
+        worksheets: [
+          { id: 'sheet-1', name: 'Sales', cells: [['Revenue', '100']] },
+          { id: 'sheet-2', name: 'Costs', cells: [['Costs', '25']] }
+        ]
+      }
+    }
+  };
+  assert.equal(validateProject(project), project);
+});
+
+test('Brightdesk project validation rejects invalid worksheet names, duplicate tabs and unknown active sheets', () => {
+  const projectWith = worksheets => ({ docs: { sheets: { worksheets, activeWorksheetId: worksheets[0]?.id } } });
+  assert.throws(() => validateProject(projectWith([
+    { id: 'one', name: 'Overview', cells: [['1']] },
+    { id: 'two', name: 'overview', cells: [['2']] }
+  ])), /duplicate worksheet name/i);
+  assert.throws(() => validateProject(projectWith([
+    { id: 'one', name: 'bad/name', cells: [['1']] }
+  ])), /invalid worksheet name/i);
+  assert.throws(() => validateProject({ docs: { sheets: {
+    worksheets: [{ id: 'one', name: 'Overview', cells: [['1']] }],
+    activeWorksheetId: 'missing'
+  } } }), /active worksheet/i);
+});
+
+test('Brightdesk project files preserve every worksheet and the active selection', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-multi-sheet-project-'));
+  const filePath = path.join(directory, 'quarterly-plan.bdesk');
+  const project = {
+    title: 'Quarterly plan',
+    docs: {
+      sheets: {
+        title: 'Quarterly plan',
+        activeWorksheetId: 'sheet-2',
+        cells: [['Costs', '25']],
+        worksheets: [
+          { id: 'sheet-1', name: 'Sales', cells: [['Revenue', '100']] },
+          { id: 'sheet-2', name: 'Costs', cells: [['Costs', '25']] }
+        ]
+      }
+    }
+  };
+  try {
+    await exportOfficeFile({ project }, filePath);
+    assert.deepEqual(await openOfficeFile(filePath), project);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('XLSX import and export preserve all worksheet names and values', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-multi-sheet-xlsx-'));
+  const filePath = path.join(directory, 'quarterly-plan.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Quarterly plan',
+    rows: [['Revenue', '100']],
+    activeWorksheetId: 'sheet-2',
+    worksheets: [
+      { id: 'sheet-1', name: 'Sales', cells: [['Revenue', '100'], ['North', '60']] },
+      { id: 'sheet-2', name: 'Costs', cells: [['Costs', '25'], ['Rent', '10']] }
+    ]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.equal(imported.worksheets.length, 2);
+    assert.deepEqual(imported.worksheets.map(sheet => sheet.name), ['Sales', 'Costs']);
+    assert.deepEqual(imported.worksheets[0].cells, payload.worksheets[0].cells);
+    assert.deepEqual(imported.worksheets[1].cells, payload.worksheets[1].cells);
+    assert.equal(imported.activeWorksheetId, 'sheet-1');
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
