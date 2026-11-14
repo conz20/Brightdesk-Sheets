@@ -7,34 +7,19 @@ on:
       - '**/*.mdx'
   push:
     branches: [main]
+    tags: ['v*']
     paths-ignore:
       - '**/*.md'
       - '**/*.mdx'
   schedule:
     - cron: '17 4 * * 1'
-  workflow_dispatch:
-    inputs:
-      build_installers:
-        description: Build the Windows, macOS and Linux desktop installers
-        type: boolean
-        required: true
-        default: true
-      publish_release:
-        description: Publish a GitHub Release after all product installers pass verification
-        type: boolean
-        required: true
-        default: false
-      release_tag:
-        description: Release tag
-        type: string
-        required: true
-        default: v0.1.0
 permissions:
   contents: read
   actions: read
 jobs:
   test:
     name: Test Brightdesk Sheets
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, macOS, ARM64, brightdesk-product-ci]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -50,18 +35,18 @@ jobs:
       - run: npm audit --audit-level=high
   build:
     name: Build ${{ matrix.platform }} desktop installer
-    if: github.event_name == 'workflow_dispatch' && inputs.build_installers == true
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     needs: test
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: win
-            runner: windows-latest
+            runner: ["self-hosted", "Windows", "X64"]
           - platform: mac
-            runner: macos-latest
+            runner: ["self-hosted", "macOS", "ARM64"]
           - platform: linux
-            runner: ubuntu-latest
+            runner: ["self-hosted", "Linux", "X64"]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -80,7 +65,7 @@ jobs:
           retention-days: 14
   publish:
     name: Publish approved Brightdesk Sheets release
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_release == true && inputs.build_installers == true
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: [self-hosted, macOS, ARM64, brightdesk-product-ci]
     permissions:
@@ -93,7 +78,7 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
-          tag_name: ${{ inputs.release_tag }}
-          name: Brightdesk Sheets ${{ inputs.release_tag }}
+          tag_name: ${{ github.ref_name }}
+          name: Brightdesk Sheets ${{ github.ref_name }}
           generate_release_notes: true
           files: release/**
