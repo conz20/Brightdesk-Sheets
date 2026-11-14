@@ -81,7 +81,7 @@ function applySheetHistory(direction) {
     : sheetHistory.redo(workbookHistory, current);
   if (!restored) { setStatus(direction === 'undo' ? 'Nothing to undo' : 'Nothing to redo'); return; }
   state.docs.sheets = workbookModel.normalizeWorkbook(restored, defaults.sheets.cells);
-  state.selectedCell = { row: 0, col: 0 };
+  resetSheetSelection();
   persist();
   renderSheet();
   renderToolbar();
@@ -563,7 +563,7 @@ function deleteWorksheetWithConfirmation(worksheetId) {
   try {
     recordSheetHistory();
     workbookModel.deleteWorksheet(activeDoc(), worksheetId);
-    state.selectedCell = { row: 0, col: 0 };
+    resetSheetSelection();
     renderSheet();
     renderToolbar();
     persist();
@@ -593,7 +593,7 @@ function renderSheetTabs() {
     tab.addEventListener('click', () => {
       if (worksheet.id === doc.activeWorksheetId) return;
       workbookModel.activateWorksheet(doc, worksheet.id);
-      state.selectedCell = { row: 0, col: 0 };
+      resetSheetSelection();
       renderSheet();
       renderToolbar();
       persist();
@@ -631,7 +631,7 @@ function renderSheetTabs() {
   add.addEventListener('click', () => {
     recordSheetHistory();
     workbookModel.addWorksheet(doc);
-    state.selectedCell = { row: 0, col: 0 };
+    resetSheetSelection();
     renderSheet(); renderToolbar(); persist();
   });
   const rename = document.createElement('button');
@@ -689,7 +689,7 @@ function navigateSheetCell(input, event) {
     return true;
   }
 
-  state.selectedCell = target;
+  resetSheetSelection(target.row, target.col);
   let next = sheetWrap.querySelector(`input.grid-cell[data-row="${target.row}"][data-col="${target.col}"]`);
   if (!next) {
     renderSheet();
@@ -714,7 +714,33 @@ function renderSheet() {
   const tbody=document.createElement('tbody');
   rows.forEach((row,r)=>{const tr=document.createElement('tr'),th=document.createElement('th');th.textContent=String(r+1);tr.append(th);
     for(let c=0;c<maxCols;c++){const td=document.createElement('td'),input=document.createElement('input');input.className='grid-cell';input.value=formattedCellValue(r,c);input.dataset.row=r;input.dataset.col=c;input.setAttribute('aria-label',`${letter(c)}${r+1}`);input.lang=state.proofingLanguage;applyCellVisualStyle(input,r,c);
-      input.addEventListener('focus',()=>{state.selectedCell={row:r,col:c};input.value=cellRaw(r,c);renderToolbar();updateSheetFormulaBar();});
+      input.addEventListener('mousedown', event => {
+        state.pendingMouseSelection = true;
+        state.extendSelectionOnClick = Boolean(event.shiftKey && state.selectionAnchor);
+        if (!state.extendSelectionOnClick) state.selectionAnchor = { row: r, col: c };
+      });
+      input.addEventListener('focus', () => {
+        state.selectedCell = { row: r, col: c };
+        if (!state.pendingMouseSelection) {
+          state.selectionAnchor = { row: r, col: c };
+          state.selectedRange = sheetRange.rangeFromCells(state.selectionAnchor, state.selectedCell);
+        }
+        input.value = cellRaw(r, c);
+        applySheetRangeHighlight();
+        renderToolbar();
+        updateSheetFormulaBar();
+      });
+      input.addEventListener('click', () => {
+        const focus = { row: r, col: c };
+        if (!state.extendSelectionOnClick) state.selectionAnchor = focus;
+        state.selectedCell = focus;
+        state.selectedRange = sheetRange.rangeFromCells(state.selectionAnchor, focus);
+        state.pendingMouseSelection = false;
+        state.extendSelectionOnClick = false;
+        applySheetRangeHighlight();
+        renderToolbar();
+        updateSheetFormulaBar();
+      });
       input.addEventListener('blur',()=>{if(input.dataset.edited!=='true')input.value=formattedCellValue(r,c);});
       input.addEventListener('input',()=>{input.dataset.edited='true';});
       input.addEventListener('change',()=>{if(input.dataset.edited==='true')setCell(r,c,input.value);input.dataset.edited='false';refreshSheetValues();});
@@ -722,6 +748,7 @@ function renderSheet() {
       td.append(input);tr.append(td);}
     tbody.append(tr);
   }); table.append(tbody); sheetWrap.innerHTML=''; sheetWrap.append(table);
+  applySheetRangeHighlight();
   renderSheetTabs();
   updateSheetFormulaBar();
 }
@@ -1355,7 +1382,7 @@ function importProject(data){
     state.docs.sheets = workbookModel.normalizeWorkbook({
       title: data.title || 'Imported spreadsheet', cells, worksheets, activeWorksheetId: data.activeWorksheetId
     }, defaults.sheets.cells);
-    state.selectedCell = { row: 0, col: 0 };
+    resetSheetSelection();
   }
   if(kind==='slides')state.docs.slides={title:data.title||'Imported presentation',slides:data.slides||clone(defaults.slides.slides),current:0};
   if(kind==='notes')state.docs.notes={title:data.title||'Imported note',text:data.text||''};
