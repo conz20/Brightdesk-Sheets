@@ -197,6 +197,30 @@ function assertTableCollection(tables, rows, options = {}) {
 }
 
 
+function excelColumnNumber(label) {
+  let result = 0;
+  for (const character of String(label).toUpperCase()) {
+    result = result * 26 + character.charCodeAt(0) - 64;
+  }
+  return result;
+}
+
+function parseExcelCellAddress(value) {
+  const match = String(value || '').match(/^\\$?([A-Z]{1,3})\\$?([1-9]\\d*)$/i);
+  if (!match) return null;
+  return { row: Number(match[2]) - 1, column: excelColumnNumber(match[1]) - 1 };
+}
+
+function parseExcelRangeAddress(value) {
+  if (typeof value !== 'string') return null;
+  const parts = value.split(':');
+  if (parts.length !== 2) return null;
+  const start = parseExcelCellAddress(parts[0]);
+  const end = parseExcelCellAddress(parts[1]);
+  if (!start || !end || end.row < start.row || end.column < start.column) return null;
+  return { top: start.row, left: start.column, bottom: end.row, right: end.column };
+}
+
 function columnLabel(number) {
   let value = number;
   let label = '';
@@ -449,8 +473,28 @@ async function openOfficeFile(filePath) {
         id: `sheet-${index + 1}`, name, cells: rows, styles,
         autoFilter: hasExcelAutoFilterRange(sheet.autoFilter)
           ? { enabled: true, filters: {} }
-          : { enabled: false, filters: {} }
+          : { enabled: false, filters: {} },
+        tables: []
       };
+      for (const excelTable of sheet.getTables()) {
+        const model = excelTable.model;
+        const range = parseExcelRangeAddress(model.tableRef || model.autoFilterRef);
+        const columns = Array.isArray(model.columns) ? model.columns.map(column => column.name) : [];
+        if (!range || model.headerRow === false || model.totalsRow === true ||
+            typeof model.name !== 'string' || !columns.length ||
+            range.bottom >= rows.length || range.right - range.left + 1 !== columns.length) {
+          continue;
+        }
+        importedWorksheet.tables.push({
+          id: `table-${workbookCellCount}-${importedWorksheet.tables.length + 1}`,
+          name: model.name,
+          range,
+          columns,
+          headerRow: true,
+          totalsRow: false,
+          style: 'brightdesk-green'
+        });
+      }
       worksheets.push(importedWorksheet);
     });
     if (!worksheets.length) return { kind: 'sheets', title: path.basename(filePath, ext), cells: [[]] };
@@ -540,6 +584,8 @@ async function exportOfficeFile(payload, filePath) {
     const usedNames = new Set();
     let workbookCellCount = 0;
     let activeTab = 0;
+    const workbookTableNames = new Set();
+    const workbookTableIds = new Set();
     if (payload.activeWorksheetId) {
       const foundIndex = sourceSheets.findIndex(source => source?.id === payload.activeWorksheetId);
       if (foundIndex >= 0) activeTab = foundIndex;
@@ -558,9 +604,36 @@ async function exportOfficeFile(payload, filePath) {
         const address = `${columnLabel(c + 1)}${r + 1}`;
         applyExcelCellStyle(cell, source.styles?.[address] || (index === activeTab ? payload.styles?.[address] : null));
       }));
+      const worksheetTables = assertTableCollection(
+        source.tables ?? (index === activeTab ? payload.tables : undefined),
+        rows,
+        { names: workbookTableNames, ids: workbookTableIds }
+      );
+      for (const table of worksheetTables) {
+        if (table.headerRow === false || table.totalsRow === true) continue;
+        const tableRows = [];
+        for (let row = table.range.top + 1; row <= table.range.bottom; row += 1) {
+          tableRows.push(rows[row].slice(table.range.left, table.range.right + 1).map(value => {
+            if (typeof value === 'string' && value.startsWith('=')) return { formula: value.slice(1) };
+            if (value === '' || value == null) return null;
+            if (typeof value === 'string' && Number.isFinite(Number(value)) && value.trim() !== '') return Number(value);
+            return value;
+          }));
+        }
+        sheet.addTable({
+          name: table.name,
+          ref: `${columnLabel(table.range.left + 1)}${table.range.top + 1}`,
+          headerRow: true,
+          totalsRow: false,
+          style: { theme: 'TableStyleMedium4', showRowStripes: true },
+          columns: table.columns.map(name => ({ name, filterButton: true })),
+          rows: tableRows
+        });
+      }
+
       const filterState = assertAutoFilterState(source.autoFilter ?? (index === activeTab ? payload.autoFilter : undefined));
       const filterColumnCount = rows.reduce((maximum, row) => Math.max(maximum, row.length), 0);
-      if (filterState.enabled && rows.length > 0 && filterColumnCount > 0) {
+      if (filterState.enabled && rows.length > 0 && filterColumnCount > 0 && worksheetTables.length === 0) {
         sheet.autoFilter = `A1:${columnLabel(filterColumnCount)}${rows.length}`;
       }
       sheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 1 }];
