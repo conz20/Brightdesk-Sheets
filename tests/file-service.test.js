@@ -211,8 +211,8 @@ test('Brightdesk project files preserve every worksheet and the active selection
         activeWorksheetId: 'sheet-2',
         cells: [['Costs', '25']],
         worksheets: [
-          { id: 'sheet-1', name: 'Sales', cells: [['Revenue', '100']] },
-          { id: 'sheet-2', name: 'Costs', cells: [['Costs', '25']] }
+          { id: 'sheet-1', name: 'Sales', cells: [['Revenue', '100']], styles: { A1: { bold: true, color: '#1E6847' } } },
+          { id: 'sheet-2', name: 'Costs', cells: [['Costs', '25']], styles: { B1: { numberFormat: 'currency' } } }
         ]
       }
     }
