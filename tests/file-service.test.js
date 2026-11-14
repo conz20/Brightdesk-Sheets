@@ -522,3 +522,32 @@ test('XLSX import preserves separate named tables across worksheets', async () =
     assert.equal(imported.tables[0].name, 'CostsTable');
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+
+
+test('Brightdesk project files preserve named tables independently across worksheets', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-tables-project-'));
+  const filePath = path.join(directory, 'tables.bdesk');
+  const salesTable = {
+    id: 'table-1', name: 'SalesTable',
+    range: { top: 0, left: 0, bottom: 1, right: 1 },
+    columns: ['Product', 'Amount'], headerRow: true, totalsRow: false, style: 'brightdesk-green'
+  };
+  const costsTable = {
+    id: 'table-2', name: 'CostsTable',
+    range: { top: 0, left: 0, bottom: 1, right: 1 },
+    columns: ['Item', 'Cost'], headerRow: true, totalsRow: false, style: 'brightdesk-green'
+  };
+  const project = { docs: { sheets: {
+    activeWorksheetId: 'costs',
+    cells: [['Item', 'Cost'], ['Rent', 500]],
+    tables: [costsTable],
+    worksheets: [
+      { id: 'sales', name: 'Sales', cells: [['Product', 'Amount'], ['Pen', 10]], tables: [salesTable] },
+      { id: 'costs', name: 'Costs', cells: [['Item', 'Cost'], ['Rent', 500]], tables: [costsTable] }
+    ]
+  } } };
+  try {
+    await exportOfficeFile({ project }, filePath);
+    assert.deepEqual(await openOfficeFile(filePath), project);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
