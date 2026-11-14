@@ -170,6 +170,11 @@ test('keeps table column names and normalized header cells in sync when a header
   assert.deepEqual(workbook.cells[0], ['Product', 'Product 2']);
   assert.deepEqual(workbook.worksheets[0].tables[0].columns, ['Product', 'Product 2']);
 
+  const cleared = updateWorkbookTableHeader(workbook, 0, 1, '   ');
+  assert.deepEqual(cleared.columns, ['Product', 'Column2']);
+  assert.deepEqual(workbook.cells[0], ['Product', 'Column2']);
+  assert.deepEqual(workbook.worksheets[0].tables[0].columns, ['Product', 'Column2']);
+
   assert.equal(updateWorkbookTableHeader(workbook, 1, 1, '15'), null);
 });
 
@@ -185,4 +190,10 @@ test('synchronizes table column names after bulk edits change worksheet header c
   assert.deepEqual(workbook.tables[0].columns, ['Product', 'Product 2']);
   assert.deepEqual(workbook.worksheets[0].cells[0], ['Product', 'Product 2']);
   assert.deepEqual(workbook.worksheets[0].tables[0].columns, ['Product', 'Product 2']);
+
+  workbook.cells[0][1] = '';
+  synchronizeWorkbookTableHeaders(workbook);
+  assert.deepEqual(workbook.cells[0], ['Product', 'Column2']);
+  assert.deepEqual(workbook.tables[0].columns, ['Product', 'Column2']);
+  assert.deepEqual(workbook.worksheets[0].tables[0].columns, ['Product', 'Column2']);
 });
