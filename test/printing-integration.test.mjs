@@ -12,6 +12,12 @@ test("configured-printer refresh returns queues to the print action and preserve
   assert.ok(app.includes("refreshConfiguredPrinters({ throwOnError: true })"));
 });
 
+test("Sheets submits print requests in landscape orientation", () => {
+  const app = read("src/app.js");
+  assert.ok(app.includes('const printRequest = { printBackground: true, orientation: "landscape" };'));
+  assert.ok(app.includes("window.brightdesk.printing.print(printRequest)"));
+});
+
 test("Printing snapshot is the dependency-free approved upstream version",()=>{
  const pkg=JSON.parse(read("src/printing-package/package.json"));const source=JSON.parse(read("src/printing-package/UPSTREAM.json"));
  assert.equal(pkg.name,"@brightdesk/printing");assert.equal(pkg.version,"0.1.0");assert.deepEqual(pkg.dependencies||{},{});
