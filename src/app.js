@@ -574,8 +574,24 @@ function fillSelectedRangeRight() {
     setStatus(selectedRangeStatus('Filled right', range));
   } catch (error) { setStatus('Fill Right failed: ' + error.message); }
 }
-function addSheetRow() { recordSheetHistory(); const cells = activeDoc().cells; cells.push(Array(cells[0]?.length || 12).fill('')); renderSheet(); persist(); }
-function addSheetColumn() { recordSheetHistory(); activeDoc().cells.forEach(row => row.push('')); renderSheet(); persist(); }
+function addSheetRow() {
+  try {
+    const cells = sheetNavigation.appendSheetRow(activeDoc().cells || []);
+    recordSheetHistory();
+    activeDoc().cells = cells;
+    renderSheet();
+    persist();
+  } catch (error) { setStatus('Could not add row: ' + error.message); }
+}
+function addSheetColumn() {
+  try {
+    const cells = sheetNavigation.appendSheetColumn(activeDoc().cells || []);
+    recordSheetHistory();
+    activeDoc().cells = cells;
+    renderSheet();
+    persist();
+  } catch (error) { setStatus('Could not add column: ' + error.message); }
+}
 function insertColumnFormula(name) {
   const { row, col } = state.selectedCell; const column = letter(col);
   const start = row > 0 ? 1 : 2; const end = row > 0 ? row : Math.max(6, row + 6);
