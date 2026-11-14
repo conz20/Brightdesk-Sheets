@@ -84,3 +84,37 @@ test('rejects style ranges that exceed the worksheet cell limit', () => {
     top: 0, left: 0, bottom: 500, right: 500
   }, { bold: true }), /250,000-cell limit/i);
 });
+
+test('Fill Down copies the first row formatting through the selected range', () => {
+  const styles = fillCellStylesDown({
+    A1: { bold: true, fill: '#EDF7F1' },
+    A2: { italic: true },
+    B1: { numberFormat: 'currency' }
+  }, { top: 0, left: 0, bottom: 2, right: 1 });
+
+  assert.deepEqual(styles.A2, styles.A1);
+  assert.deepEqual(styles.A3, styles.A1);
+  assert.deepEqual(styles.B2, styles.B1);
+  assert.deepEqual(styles.B3, styles.B1);
+});
+
+test('Fill Right copies the first column formatting across the selected range', () => {
+  const styles = fillCellStylesRight({
+    A1: { bold: true },
+    B1: { italic: true },
+    A2: { fill: '#EDF7F1' }
+  }, { top: 0, left: 0, bottom: 1, right: 2 });
+
+  assert.deepEqual(styles.B1, styles.A1);
+  assert.deepEqual(styles.C1, styles.A1);
+  assert.deepEqual(styles.B2, styles.A2);
+  assert.deepEqual(styles.C2, styles.A2);
+});
+
+test('fill operations remove destination formatting when the source cell is unformatted', () => {
+  const styles = fillCellStylesDown({
+    A2: { bold: true },
+    A3: { italic: true }
+  }, { top: 0, left: 0, bottom: 2, right: 0 });
+  assert.deepEqual(styles, {});
+});
