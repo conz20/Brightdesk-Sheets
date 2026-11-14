@@ -199,35 +199,19 @@ function addWorksheet(document, requestedName) {
 }
 
 function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\function renameWorksheet(document, worksheetId, requestedName) {
-  const target = document?.worksheets?.find(sheet => sheet.id === worksheetId);
-  if (!target) throw new Error('The selected worksheet could not be found.');
-  const name = String(requestedName ?? '').trim();
-  if (!name) throw new Error('A worksheet name is required.');
-  if (name.length > 31) throw new Error('Worksheet names can be no longer than 31 characters.');
-  if (/[\\/?*:[\]]/.test(name)) throw new Error('Worksheet names cannot contain: \\ / ? * [ or ].');
-  const duplicate = document.worksheets.some(sheet => sheet.id !== worksheetId && sheet.name.toLocaleLowerCase() === name.toLocaleLowerCase());
-  if (duplicate) throw new Error('A worksheet with that name already exists.');
-  target.name = name;
-  return document;
-}');
+  return value.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&');
 }
 
 function updateFormulaSheetReferences(formula, oldName, newName) {
   if (typeof formula !== 'string' || !formula.startsWith('=')) return formula;
-  const quotedOldName = `'${oldName.replace(/'/g, "''")}'`;
+  const quotedOldName = "'" + oldName.replace(/'/g, "''") + "'";
   const quotedPattern = escapeRegExp(quotedOldName);
-  const unquotedPattern = /^[A-Za-z_][A-Za-z0-9_.]*$/.test(oldName)
-    ? escapeRegExp(oldName)
-    : null;
+  const unquotedPattern = /^[A-Za-z_][A-Za-z0-9_.]*$/.test(oldName) ? escapeRegExp(oldName) : null;
   const alternatives = [quotedPattern, unquotedPattern].filter(Boolean).join('|');
-  const referencePattern = new RegExp(`(?<![A-Za-z0-9_.])(?:${alternatives})(?=!)`, 'gi');
+  const referencePattern = new RegExp('(?<![A-Za-z0-9_.])(?:' + alternatives + ')(?=!)', 'gi');
   const quoteNewName = !/^[A-Za-z_][A-Za-z0-9_.]*$/.test(newName);
-
   return formula.replace(referencePattern, match => {
-    if (match.startsWith("'") || quoteNewName) {
-      return `'${newName.replace(/'/g, "''")}'`;
-    }
+    if (match.startsWith("'") || quoteNewName) return "'" + newName.replace(/'/g, "''") + "'";
     return newName;
   });
 }
@@ -238,7 +222,7 @@ function renameWorksheet(document, worksheetId, requestedName) {
   const name = String(requestedName ?? '').trim();
   if (!name) throw new Error('A worksheet name is required.');
   if (name.length > 31) throw new Error('Worksheet names can be no longer than 31 characters.');
-  if (/[\\/?*:[\]]/.test(name)) throw new Error('Worksheet names cannot contain: \\ / ? * [ or ].');
+  if (/[\\\\/?*:[\\]]/.test(name)) throw new Error('Worksheet names cannot contain: \\\\ / ? * [ or ].');
   const duplicate = document.worksheets.some(sheet => sheet.id !== worksheetId && sheet.name.toLocaleLowerCase() === name.toLocaleLowerCase());
   if (duplicate) throw new Error('A worksheet with that name already exists.');
 
