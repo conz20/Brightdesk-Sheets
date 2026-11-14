@@ -508,6 +508,8 @@ async function openOfficeFile(filePath) {
       title: path.basename(filePath, ext),
       cells: activeWorksheet.cells,
       styles: activeWorksheet.styles,
+      autoFilter: activeWorksheet.autoFilter,
+      tables: activeWorksheet.tables,
       worksheets,
       activeWorksheetId: activeWorksheet.id
     };
