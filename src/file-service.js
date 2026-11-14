@@ -97,6 +97,18 @@ function assertCellStyles(styles) {
   return styles;
 }
 
+function hasExcelAutoFilterRange(value) {
+  if (typeof value === 'string') {
+    return /^\\$?[A-Z]{1,3}\\$?[1-9]\\d*:\\$?[A-Z]{1,3}\\$?[1-9]\\d*$/i.test(value);
+  }
+  if (!isPlainObject(value) || value.from == null || value.to == null) return false;
+  const isAddress = item => typeof item === 'string'
+    ? /^\\$?[A-Z]{1,3}\\$?[1-9]\\d*$/i.test(item)
+    : isPlainObject(item) && Number.isInteger(item.row) && Number.isInteger(item.column) &&
+      item.row > 0 && item.column > 0;
+  return isAddress(value.from) && isAddress(value.to);
+}
+
 function assertAutoFilterState(value) {
   if (value === undefined) return {};
   if (!isPlainObject(value) || typeof value.enabled !== 'boolean' ||
@@ -363,7 +375,7 @@ async function openOfficeFile(filePath) {
       workbookCellCount += rows.reduce((count, row) => count + row.length, 0);
       if (workbookCellCount > MAX_SHEET_CELLS) throw new Error('The imported spreadsheet exceeds the 250,000-cell limit.');
       const importedWorksheet = { id: `sheet-${index + 1}`, name, cells: rows, styles };
-      if (sheet.autoFilter) importedWorksheet.autoFilter = { enabled: true, filters: {} };
+      if (hasExcelAutoFilterRange(sheet.autoFilter)) importedWorksheet.autoFilter = { enabled: true, filters: {} };
       worksheets.push(importedWorksheet);
     });
     if (!worksheets.length) return { kind: 'sheets', title: path.basename(filePath, ext), cells: [[]] };
