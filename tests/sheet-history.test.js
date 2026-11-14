@@ -46,6 +46,22 @@ test('history is bounded to the configured number of snapshots', () => {
   assert.equal(undo(history, { value: 2 }), null);
 });
 
+test('history trims old snapshots to stay within its memory budget', () => {
+  const history = createHistory({ limit: 10, maxBytes: 100 });
+  capture(history, { value: 'a'.repeat(10) });
+  capture(history, { value: 'b'.repeat(10) });
+  capture(history, { value: 'c'.repeat(10) });
+  assert.deepEqual(undo(history, { value: 'd'.repeat(10) }), { value: 'c'.repeat(10) });
+  assert.deepEqual(undo(history, { value: 'c'.repeat(10) }), { value: 'b'.repeat(10) });
+  assert.equal(undo(history, { value: 'b'.repeat(10) }), null);
+});
+
+test('oversized snapshots are rejected instead of exhausting memory', () => {
+  const history = createHistory({ maxBytes: 100 });
+  assert.equal(capture(history, { value: 'x'.repeat(200) }), false);
+  assert.equal(canUndo(history), false);
+});
+
 test('empty undo and redo return null and expose their availability', () => {
   const history = createHistory();
   assert.equal(undo(history, { value: 1 }), null);
