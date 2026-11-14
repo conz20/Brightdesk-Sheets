@@ -150,3 +150,20 @@ test('rejects invalid sort columns and malformed worksheet grids without mutatin
   assert.throws(() => sortWorksheet([['A'], null], {}, 0), /valid worksheet grid/i);
   assert.deepEqual(cells, [['A'], ['B']]);
 });
+
+
+test('keeps local formula references attached to the same logical rows after sorting', () => {
+  const cells = [
+    ['Name', 'Local reference', 'Same-sheet named reference', 'Other-sheet reference'],
+    ['C', '=A3*2', "='Sales'!A3", "='Budget'!A3"],
+    ['A', '=A2*3', "='Sales'!A2", "='Budget'!A2"],
+    ['B', '=A2+A3', "='Sales'!A2+'Sales'!A3", "='Budget'!A2+'Budget'!A3"]
+  ];
+  const result = sortWorksheet(cells, {}, 0, { worksheetName: 'Sales' });
+  assert.deepEqual(result.cells, [
+    ['Name', 'Local reference', 'Same-sheet named reference', 'Other-sheet reference'],
+    ['A', '=A4*3', "='Sales'!A4", "='Budget'!A2"],
+    ['B', '=A4+A2', "='Sales'!A4+'Sales'!A2", "='Budget'!A2+'Budget'!A3"],
+    ['C', '=A2*2', "='Sales'!A2", "='Budget'!A3"]
+  ]);
+});
