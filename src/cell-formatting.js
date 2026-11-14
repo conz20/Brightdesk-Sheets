@@ -69,5 +69,52 @@
     return next;
   }
 
-  return { DEFAULT_STYLE, normalizeCellStyle, formatCellDisplay, updateCellStyle, removeCellStyle };
+  function columnLabel(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= 16_384) throw new RangeError('The selected column is outside the supported spreadsheet range.');
+    let value = index + 1;
+    let label = '';
+    while (value > 0) {
+      const remainder = (value - 1) % 26;
+      label = String.fromCharCode(65 + remainder) + label;
+      value = Math.floor((value - 1) / 26);
+    }
+    return label;
+  }
+
+  function normalizeStyleRange(range) {
+    if (!range || !Number.isInteger(range.top) || !Number.isInteger(range.left) ||
+        !Number.isInteger(range.bottom) || !Number.isInteger(range.right) ||
+        range.top < 0 || range.left < 0 || range.bottom < range.top || range.right < range.left ||
+        range.bottom >= 1_048_576 || range.right >= 16_384) {
+      throw new RangeError('Choose a valid cell range.');
+    }
+    const rows = range.bottom - range.top + 1;
+    const columns = range.right - range.left + 1;
+    if (rows > Math.floor(250_000 / columns)) throw new RangeError('The selected range exceeds the 250,000-cell limit.');
+    return { top: range.top, left: range.left, bottom: range.bottom, right: range.right };
+  }
+
+  function updateCellStylesInRange(styles, range, changes) {
+    const selected = normalizeStyleRange(range);
+    let next = { ...(styles && typeof styles === 'object' && !Array.isArray(styles) ? styles : {}) };
+    for (let row = selected.top; row <= selected.bottom; row += 1) {
+      for (let col = selected.left; col <= selected.right; col += 1) {
+        next = updateCellStyle(next, columnLabel(col) + (row + 1), changes);
+      }
+    }
+    return next;
+  }
+
+  function removeCellStylesInRange(styles, range) {
+    const selected = normalizeStyleRange(range);
+    let next = { ...(styles && typeof styles === 'object' && !Array.isArray(styles) ? styles : {}) };
+    for (let row = selected.top; row <= selected.bottom; row += 1) {
+      for (let col = selected.left; col <= selected.right; col += 1) {
+        next = removeCellStyle(next, columnLabel(col) + (row + 1));
+      }
+    }
+    return next;
+  }
+
+  return { DEFAULT_STYLE, normalizeCellStyle, formatCellDisplay, updateCellStyle, removeCellStyle, updateCellStylesInRange, removeCellStylesInRange };
 });
