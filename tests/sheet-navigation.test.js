@@ -90,3 +90,21 @@ test('keeps keyboard navigation inside the supported spreadsheet boundaries', ()
   assert.equal(getKeyboardNavigationTarget({ row: 1048575, col: 16383, key: 'Tab' }), null);
   assert.equal(getKeyboardNavigationTarget({ row: 3, col: 3, key: 'Escape' }), null);
 });
+
+
+test('maps spreadsheet worksheet shortcuts for previous, next and new sheet actions', () => {
+  const { getWorksheetShortcutAction } = require('../src/sheet-navigation');
+  assert.equal(getWorksheetShortcutAction({ key: 'PageUp', ctrlKey: true }), 'previous-sheet');
+  assert.equal(getWorksheetShortcutAction({ key: 'PageDown', ctrlKey: true }), 'next-sheet');
+  assert.equal(getWorksheetShortcutAction({ key: 'PageUp', metaKey: true }), 'previous-sheet');
+  assert.equal(getWorksheetShortcutAction({ key: 'PageDown', metaKey: true }), 'next-sheet');
+  assert.equal(getWorksheetShortcutAction({ key: 'F11', shiftKey: true }), 'add-sheet');
+});
+
+test('does not claim worksheet shortcuts without the required modifier', () => {
+  const { getWorksheetShortcutAction } = require('../src/sheet-navigation');
+  assert.equal(getWorksheetShortcutAction({ key: 'PageUp' }), null);
+  assert.equal(getWorksheetShortcutAction({ key: 'PageDown', shiftKey: true }), null);
+  assert.equal(getWorksheetShortcutAction({ key: 'F11' }), null);
+  assert.equal(getWorksheetShortcutAction({ key: 'F2', ctrlKey: true }), null);
+});
