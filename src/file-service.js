@@ -130,6 +130,73 @@ function assertAutoFilterState(value) {
   return value;
 }
 
+function assertTableCollection(tables, rows, options = {}) {
+  if (tables === undefined) return [];
+  if (!Array.isArray(tables) || tables.length > 1000) {
+    throw new Error('The Brightdesk Sheets workbook contains an invalid table collection.');
+  }
+  const names = options.names || new Set();
+  const ids = options.ids || new Set();
+  const ranges = [];
+  for (const table of tables) {
+    if (!isPlainObject(table) || typeof table.id !== 'string' || !table.id.trim() ||
+        table.id.length > 128 || typeof table.name !== 'string' ||
+        !/^[A-Za-z_][A-Za-z0-9_.]*$/.test(table.name) ||
+        /^[A-Z]{1,3}[1-9]\\d*$/i.test(table.name) || table.name.length > 255) {
+      throw new Error('The Brightdesk Sheets workbook contains an invalid table name or ID.');
+    }
+    const nameKey = table.name.toLocaleLowerCase();
+    if (names.has(nameKey) || ids.has(table.id)) {
+      throw new Error('The Brightdesk Sheets workbook contains a duplicate table name or ID.');
+    }
+    names.add(nameKey);
+    ids.add(table.id);
+    const range = table.range;
+    if (!isPlainObject(range) || !Number.isInteger(range.top) || !Number.isInteger(range.left) ||
+        !Number.isInteger(range.bottom) || !Number.isInteger(range.right) ||
+        range.top < 0 || range.left < 0 || range.bottom < range.top || range.right < range.left ||
+        range.bottom >= 1_048_576 || range.right >= 16_384) {
+      throw new Error('The Brightdesk Sheets workbook contains an invalid table range.');
+    }
+    const rowCount = range.bottom - range.top + 1;
+    const columnCount = range.right - range.left + 1;
+    if (rowCount > Math.floor(MAX_SHEET_CELLS / columnCount)) {
+      throw new Error('The Brightdesk Sheets workbook table exceeds the 250,000-cell limit.');
+    }
+    if (!Array.isArray(rows) || range.bottom >= rows.length ||
+        rows.slice(range.top, range.bottom + 1).some(row => !Array.isArray(row) || row.length <= range.right)) {
+      throw new Error('The Brightdesk Sheets table range must be inside the worksheet.');
+    }
+    if (!Array.isArray(table.columns) || table.columns.length !== columnCount ||
+        table.columns.some(column => typeof column !== 'string' || !column.trim() || column.length > 255)) {
+      throw new Error('The Brightdesk Sheets workbook contains invalid table columns.');
+    }
+    const columnNames = new Set();
+    for (const column of table.columns) {
+      const key = column.toLocaleLowerCase();
+      if (columnNames.has(key)) throw new Error('The Brightdesk Sheets workbook contains duplicate table column names.');
+      columnNames.add(key);
+    }
+    if (table.headerRow !== undefined && table.headerRow !== true) {
+      throw new Error('The Brightdesk Sheets workbook contains an invalid table header setting.');
+    }
+    if (table.totalsRow !== undefined && typeof table.totalsRow !== 'boolean') {
+      throw new Error('The Brightdesk Sheets workbook contains an invalid table totals-row setting.');
+    }
+    if (table.style !== undefined && table.style !== 'brightdesk-green') {
+      throw new Error('The Brightdesk Sheets workbook contains an invalid table style.');
+    }
+    for (const other of ranges) {
+      const overlaps = range.top <= other.bottom && range.bottom >= other.top &&
+        range.left <= other.right && range.right >= other.left;
+      if (overlaps) throw new Error('Brightdesk table ranges cannot overlap on the same worksheet.');
+    }
+    ranges.push(range);
+  }
+  return tables;
+}
+
+
 function columnLabel(number) {
   let value = number;
   let label = '';
