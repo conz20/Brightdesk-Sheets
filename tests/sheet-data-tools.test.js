@@ -187,17 +187,18 @@ test('sorting does not rewrite scientific-notation exponents as cell references'
 });
 
 
-test('remaps external worksheet formulas when their referenced sheet is sorted', () => {
+test('remaps external worksheet formulas without widening noncontiguous ranges when their source sheet is sorted', () => {
   const rows = [
-    ['Name', 'Value'],
-    ['C', '30'],
-    ['A', '10'],
-    ['B', '20']
+    ['Name', 'Value', 'Local range'],
+    ['C', '30', '=SUM(B2:B3)'],
+    ['A', '10', ''],
+    ['B', '20', '']
   ];
   const sorted = sortWorksheet(rows, {}, 0, { worksheetName: 'Sales' });
   const summaryFormulas = [[
     '=Sales!A2+Summary!A2',
     "=SUM('Sales'!B2:B3)",
+    '=SUM(Sales!A2:A3)',
     '=Budget!A2',
     '=A2'
   ]];
@@ -205,9 +206,11 @@ test('remaps external worksheet formulas when their referenced sheet is sorted',
     translateExternalFormulaRow(value, sorted.destinationBySourceRow, 'Sales')
   ));
 
+  assert.equal(sorted.cells[3][2], '=SUM(B4,B2)');
   assert.deepEqual(updated, [[
-    '=Sales!A3+Summary!A2',
-    "=SUM('Sales'!B3:B4)",
+    '=Sales!A4+Summary!A2',
+    "=SUM('Sales'!B4,'Sales'!B2)",
+    '=SUM(Sales!A4,Sales!A2)',
     '=Budget!A2',
     '=A2'
   ]]);
