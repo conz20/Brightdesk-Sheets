@@ -1,3 +1,8 @@
+(function (root, factory) {
+  const api = factory();
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) root.BrightdeskSheetNavigation = api;
+})(typeof window !== 'undefined' ? window : globalThis, function () {
 'use strict';
 
 const MAX_EXCEL_ROWS = 1_048_576;
@@ -45,6 +50,55 @@ function formatCellAddress(row, col) {
   return `${columnIndexToLabel(col)}${row + 1}`;
 }
 
+function getKeyboardNavigationTarget(options = {}) {
+  const { row, col, key, shiftKey = false } = options;
+  if (!Number.isInteger(row) || !Number.isInteger(col) ||
+      row < 0 || row >= MAX_EXCEL_ROWS || col < 0 || col >= MAX_EXCEL_COLUMNS) {
+    return null;
+  }
+
+  let nextRow = row;
+  let nextCol = col;
+  switch (key) {
+    case 'Enter':
+      nextRow += shiftKey ? -1 : 1;
+      break;
+    case 'Tab':
+      nextCol += shiftKey ? -1 : 1;
+      break;
+    case 'ArrowUp':
+      if (shiftKey) return null;
+      nextRow -= 1;
+      break;
+    case 'ArrowDown':
+      if (shiftKey) return null;
+      nextRow += 1;
+      break;
+    case 'ArrowLeft': {
+      if (shiftKey) return null;
+      const start = options.selectionStart;
+      const end = options.selectionEnd;
+      if (start !== 0 || end !== 0) return null;
+      nextCol -= 1;
+      break;
+    }
+    case 'ArrowRight': {
+      if (shiftKey) return null;
+      const valueLength = String(options.value ?? '').length;
+      if (options.selectionStart !== valueLength || options.selectionEnd !== valueLength) return null;
+      nextCol += 1;
+      break;
+    }
+    default:
+      return null;
+  }
+
+  if (nextRow < 0 || nextRow >= MAX_EXCEL_ROWS || nextCol < 0 || nextCol >= MAX_EXCEL_COLUMNS) {
+    return null;
+  }
+  return { row: nextRow, col: nextCol };
+}
+
 function ensureCellExists(cells, row, col, maxCells = MAX_SHEET_CELLS) {
   if (!Array.isArray(cells) || cells.some(line => !Array.isArray(line))) {
     throw new TypeError('The workbook must contain a valid cell grid.');
@@ -70,7 +124,7 @@ function ensureCellExists(cells, row, col, maxCells = MAX_SHEET_CELLS) {
   return cells[row];
 }
 
-module.exports = {
+return {
   MAX_EXCEL_ROWS,
   MAX_EXCEL_COLUMNS,
   MAX_SHEET_CELLS,
@@ -78,5 +132,7 @@ module.exports = {
   columnIndexToLabel,
   parseCellAddress,
   formatCellAddress,
+  getKeyboardNavigationTarget,
   ensureCellExists
 };
+});
