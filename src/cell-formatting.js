@@ -99,7 +99,9 @@
     let next = { ...(styles && typeof styles === 'object' && !Array.isArray(styles) ? styles : {}) };
     for (let row = selected.top; row <= selected.bottom; row += 1) {
       for (let col = selected.left; col <= selected.right; col += 1) {
-        next = updateCellStyle(next, columnLabel(col) + (row + 1), changes);
+        const address = columnLabel(col) + (row + 1);
+        const current = { ...DEFAULT_STYLE, ...normalizeCellStyle(next[address]) };
+        next[address] = normalizeCellStyle({ ...current, ...(changes || {}) });
       }
     }
     return next;
@@ -110,7 +112,7 @@
     let next = { ...(styles && typeof styles === 'object' && !Array.isArray(styles) ? styles : {}) };
     for (let row = selected.top; row <= selected.bottom; row += 1) {
       for (let col = selected.left; col <= selected.right; col += 1) {
-        next = removeCellStyle(next, columnLabel(col) + (row + 1));
+        delete next[columnLabel(col) + (row + 1)];
       }
     }
     return next;
