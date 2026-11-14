@@ -576,7 +576,8 @@ function toExcelCellValue(value) {
   // Keep identifiers and high-precision numbers as text rather than silently
   // stripping leading zeroes or rounding them to Excel's 15-digit precision.
   if (/^[+-]?0\d/.test(trimmed)) return value;
-  const significantDigits = trimmed.replace(/[^0-9]/g, '').replace(/^0+/, '').length;
+  const mantissa = trimmed.split(/[eE]/, 1)[0].replace(/^[+-]/, '');
+  const significantDigits = mantissa.replace('.', '').replace(/^0+/, '').length;
   if (significantDigits > 15) return value;
 
   if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed)) return value;
