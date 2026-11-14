@@ -702,6 +702,31 @@ test('XLSX export preserves zero-padded identifiers and high-precision numbers a
   }
 });
 
+
+test('XLSX export preserves hexadecimal and binary-looking text values', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-text-codes-'));
+  const filePath = path.join(directory, 'text-codes.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Text codes',
+    worksheets: [{
+      id: 'codes',
+      name: 'Codes',
+      cells: [['Hex code', 'Binary code', 'Decimal value'], ['0xFF', '0b101', '12.5']]
+    }]
+  };
+
+  try {
+    await exportOfficeFile(payload, filePath);
+    const reopened = await openOfficeFile(filePath);
+    assert.equal(reopened.worksheets[0].cells[1][0], '0xFF');
+    assert.equal(reopened.worksheets[0].cells[1][1], '0b101');
+    assert.equal(reopened.worksheets[0].cells[1][2], 12.5);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('XLSX round trip keeps table column names in sync after a header cell edit', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-edited-table-header-'));
   const filePath = path.join(directory, 'edited-header.xlsx');
