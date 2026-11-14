@@ -541,6 +541,10 @@ function navigateSheetCell(input, event) {
   const col = Number(input.dataset.col);
   if ((event.ctrlKey || event.metaKey) && ['z', 'y'].includes(event.key.toLowerCase())) {
     event.preventDefault();
+    if (input.dataset.edited === 'true') {
+      setCell(row, col, input.value);
+      input.dataset.edited = 'false';
+    }
     applySheetHistory(event.key.toLowerCase() === 'z' && !event.shiftKey ? 'undo' : 'redo');
     return true;
   }
