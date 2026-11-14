@@ -14,7 +14,7 @@
     if (typeof value === 'number') return Number.isFinite(value) ? value : null;
     if (typeof value !== 'string') return null;
     const text = value.trim();
-    if (!/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?$/i.test(text)) return null;
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) return null;
     const number = Number(text);
     return Number.isFinite(number) ? number : null;
   }
