@@ -477,7 +477,10 @@ function renderToolbar() {
       addButton(fill, 'Fill Down', fillSelectedRangeDown, 'Repeat the first selected row down the selected range');
       addButton(fill, 'Fill Right', fillSelectedRangeRight, 'Repeat the first selected column across the selected range');
     } else if (tab === 'insert') {
-      const insert = group('tools'); addButton(insert, label('newRow'), addSheetRow); addButton(insert, label('newColumn'), addSheetColumn);
+      const insert = group('tools');
+      addButton(insert, label('newRow'), addSheetRow);
+      addButton(insert, label('newColumn'), addSheetColumn);
+      addButton(insert, 'Table', createStructuredTable, 'Create a formatted table from the selected cell range');
     } else if (tab === 'formulas') {
       const fn = group('functions');
       ['SUM','AVERAGE','MIN','MAX','COUNT'].forEach(name => addButton(fn, name, () => insertColumnFormula(name), `Insert ${name} formula for the selected column`));
@@ -870,21 +873,12 @@ function createStructuredTable() {
   const requestedName = window.prompt('Table name', defaultName);
   if (requestedName === null) return;
   try {
-    const result = sheetTables.createTable(
-      doc.tables || [],
-      doc.cells || [],
-      range,
-      requestedName,
-      existingTables
-    );
     recordSheetHistory();
-    doc.cells = result.cells;
-    doc.tables = result.tables;
-    doc.styles = sheetTables.applyTableStyles(doc.styles || {}, result.table);
+    const table = sheetTables.createWorkbookTable(doc, range, requestedName);
     persist();
     renderSheet();
     renderToolbar();
-    setStatus('Created table ' + result.table.name + ' · ' + result.table.columns.length + ' columns');
+    setStatus('Created table ' + table.name + ' · ' + table.columns.length + ' columns');
   } catch (error) {
     setStatus(error.message);
   }
@@ -899,17 +893,12 @@ function renameStructuredTable() {
   const requestedName = window.prompt('Table name', table.name);
   if (requestedName === null) return;
   try {
-    const tables = sheetTables.renameTable(
-      doc.tables || [],
-      table.id,
-      requestedName,
-      allOtherWorksheetTables(doc)
-    );
     recordSheetHistory();
-    doc.tables = tables;
+    const renamed = sheetTables.renameWorkbookTable(doc, table.id, requestedName);
     persist();
+    renderSheet();
     renderToolbar();
-    setStatus('Renamed table to ' + requestedName.trim());
+    setStatus('Renamed table to ' + renamed.name);
   } catch (error) {
     setStatus(error.message);
   }
@@ -923,8 +912,9 @@ function convertStructuredTableToRange() {
   }
   if (!window.confirm('Convert ' + table.name + ' to a normal cell range? Your cell values and formatting will remain.')) return;
   recordSheetHistory();
-  doc.tables = sheetTables.removeTable(doc.tables || [], table.id);
+  sheetTables.removeWorkbookTable(doc, table.id);
   persist();
+  renderSheet();
   renderToolbar();
   setStatus('Converted ' + table.name + ' to a normal range. Cell values and formatting were kept.');
 }
