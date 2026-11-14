@@ -92,7 +92,15 @@ test('release workflow has working install and release permissions', () => {
   assert.match(workflow, /npm run release:preflight/);
   assert.match(workflow, /npm run dist:product:\$\{\{ matrix\.platform \}\}/);
   assert.match(workflow, /npm run verify:product:\$\{\{ matrix\.platform \}\}/);
-  assert.match(workflow, /publish_release:[\s\S]*?default: false/);
-  assert.match(workflow, /contents: write/);
-  assert.match(workflow, /needs: build/);
+  assert.doesNotMatch(workflow, /workflow_dispatch:/, 'installer builds must not depend on manual dispatch');
+  assert.match(workflow, /tags: \['v\*'\]/, 'version tags are the explicit release trigger');
+  assert.doesNotMatch(workflow, /windows-latest|macos-latest|ubuntu-latest/, 'platform builds must use private self-hosted runners');
+  assert.match(workflow, /runner: \["self-hosted", "Windows", "X64"\]/);
+  assert.match(workflow, /runner: \["self-hosted", "macOS", "ARM64"\]/);
+  assert.match(workflow, /runner: \["self-hosted", "Linux", "X64"\]/);
+  const publish = workflow.slice(workflow.indexOf('  publish:'));
+  assert.match(publish, /if: github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+  assert.match(publish, /tag_name: \$\{\{ github\.ref_name \}\}/);
+  assert.match(publish, /contents: write/);
+  assert.match(publish, /needs: build/);
 });
