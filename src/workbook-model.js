@@ -22,7 +22,7 @@ function cloneCellStyles(styles) {
   const result = {};
   const numberFormats = new Set(['general', 'number', 'currency', 'percent', 'date']);
   for (const [address, value] of Object.entries(styles)) {
-    if (!/^[A-Z]{1,3}[1-9]\\d*$/i.test(address) || !value || typeof value !== 'object' || Array.isArray(value)) continue;
+    if (!/^[A-Z]{1,3}[1-9]\d*$/i.test(address) || !value || typeof value !== 'object' || Array.isArray(value)) continue;
     const style = {};
     for (const key of ['bold', 'italic', 'underline']) {
       if (typeof value[key] === 'boolean') style[key] = value[key];
@@ -116,6 +116,7 @@ function addWorksheet(document, requestedName) {
   document.worksheets.push(worksheet);
   document.activeWorksheetId = worksheet.id;
   document.cells = cloneGrid(worksheet.cells);
+  document.styles = {};
   return document;
 }
 
