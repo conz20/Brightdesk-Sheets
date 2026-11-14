@@ -8,7 +8,8 @@ const {
   clearColumnFilter,
   clearAllColumnFilters,
   getVisibleRowIndexes,
-  sortWorksheet
+  sortWorksheet,
+  translateExternalFormulaRow
 } = require('../src/sheet-data-tools');
 
 test('creates a clean disabled AutoFilter state', () => {
@@ -183,4 +184,31 @@ test('sorting does not rewrite scientific-notation exponents as cell references'
     ['A', '=2.5E-1+A3'],
     ['B', '=1E3+A2']
   ]);
+});
+
+
+test('remaps external worksheet formulas when their referenced sheet is sorted', () => {
+  const rows = [
+    ['Name', 'Value'],
+    ['C', '30'],
+    ['A', '10'],
+    ['B', '20']
+  ];
+  const sorted = sortWorksheet(rows, {}, 0, { worksheetName: 'Sales' });
+  const summaryFormulas = [[
+    '=Sales!A2+Summary!A2',
+    "=SUM('Sales'!B2:B3)",
+    '=Budget!A2',
+    '=A2'
+  ]];
+  const updated = summaryFormulas.map(row => row.map(value =>
+    translateExternalFormulaRow(value, sorted.destinationBySourceRow, 'Sales')
+  ));
+
+  assert.deepEqual(updated, [[
+    '=Sales!A3+Summary!A2',
+    "=SUM('Sales'!B3:B4)",
+    '=Budget!A2',
+    '=A2'
+  ]]);
 });
