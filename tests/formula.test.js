@@ -98,3 +98,9 @@ test('rejects formula ranges larger than the bounded evaluation limit', () => {
     activeWorksheetId: 'summary'
   }), '#VALUE!');
 });
+
+test('arithmetic and worksheet formulas preserve decimals without a leading zero', () => {
+  assert.equal(arithmetic('.5 + .25'), 0.75);
+  assert.equal(arithmetic('1. + .5'), 1.5);
+  assert.equal(calculateCell([['=.5+1']], 0, 0), 1.5);
+});
