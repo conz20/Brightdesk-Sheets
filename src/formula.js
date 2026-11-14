@@ -22,7 +22,7 @@
   function arithmetic(expression) {
     const source = String(expression ?? '');
     const tokens = [];
-    const tokenPattern = /\s*(\d+(?:\.\d*)?|\.\d+|[()+\-*/%])/gy;
+    const tokenPattern = /\s*((?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|[()+\-*/%])/giy;
     let position = 0;
     while (position < source.length) {
       tokenPattern.lastIndex = position;
@@ -211,13 +211,13 @@
           case 'COUNTA': result = values.filter(value => value !== '' && value !== null && value !== undefined).length; break;
         }
       } else {
-        const referencePattern = /(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]+[1-9]\d*)|([A-Z]+[1-9]\d*)/gi;
+        const referencePattern = /(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]+[1-9]\d*)|(?<![A-Z0-9_.])([A-Z]+[1-9]\d*)/gi;
         const expression = formula.replace(referencePattern, (match, quotedSheet, plainSheet, crossSheetAddress, localAddress) => {
           const value = getRef(crossSheetAddress || localAddress, quotedSheet ? quotedSheet.replace(/''/g, "'") : (plainSheet || null));
           if (typeof value !== 'number') throw new Error('Cell is not numeric');
           return String(value);
         });
-        if (!/^[\d\s.+\-*/()%]+$/.test(expression)) throw new Error('Unsupported expression');
+        if (!/^[\d\s.eE+\-*/()%]+$/.test(expression)) throw new Error('Unsupported expression');
         result = arithmetic(expression);
       }
       return Number.isFinite(result) ? Number(result.toFixed(8)) : '#VALUE!';
