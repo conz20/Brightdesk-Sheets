@@ -423,3 +423,102 @@ test('XLSX round trip preserves AutoFilter ranges and clearly resets local-only 
     assert.deepEqual(imported.worksheets[1].cells, payload.worksheets[1].cells);
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+
+test('Brightdesk project validation accepts named worksheet tables and rejects unsafe or overlapping definitions', () => {
+  const table = {
+    id: 'table-1',
+    name: 'SalesTable',
+    range: { top: 0, left: 0, bottom: 2, right: 1 },
+    columns: ['Product', 'Amount'],
+    headerRow: true,
+    totalsRow: false,
+    style: 'brightdesk-green'
+  };
+  const valid = { docs: { sheets: {
+    activeWorksheetId: 'one',
+    worksheets: [{ id: 'one', name: 'Sales', cells: [
+      ['Product', 'Amount'], ['Pen', '10'], ['Paper', '20']
+    ], tables: [table] }]
+  } } };
+  assert.equal(validateProject(valid), valid);
+
+  const invalidTable = change => ({ docs: { sheets: {
+    activeWorksheetId: 'one',
+    worksheets: [{ id: 'one', name: 'Sales', cells: [
+      ['Product', 'Amount'], ['Pen', '10'], ['Paper', '20']
+    ], tables: [{ ...table, ...change }] }]
+  } } });
+  assert.throws(() => validateProject(invalidTable({ name: 'Bad Name' })), /invalid table name/i);
+  assert.throws(() => validateProject(invalidTable({ range: { top: 0, left: 0, bottom: 3, right: 1 } })), /inside the worksheet/i);
+  assert.throws(() => validateProject(invalidTable({ columns: ['Only one'] })), /invalid table columns/i);
+  assert.throws(() => validateProject(invalidTable({ style: 'external-style' })), /invalid table/i);
+  assert.throws(() => validateProject({ docs: { sheets: {
+    activeWorksheetId: 'one',
+    worksheets: [{ id: 'one', name: 'Sales', cells: [
+      ['A', 'B'], ['1', '2'], ['3', '4']
+    ], tables: [
+      table,
+      { ...table, id: 'table-2', name: 'SecondTable', range: { top: 1, left: 1, bottom: 2, right: 1 }, columns: ['Amount'] }
+    ] }]
+  } } }), /overlap/i);
+});
+
+test('XLSX round trip retains named Excel tables with data rows and Brightdesk table style', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-table-xlsx-'));
+  const filePath = path.join(directory, 'sales-table.xlsx');
+  const table = {
+    id: 'table-1',
+    name: 'SalesTable',
+    range: { top: 0, left: 0, bottom: 2, right: 1 },
+    columns: ['Product', 'Amount'],
+    headerRow: true,
+    totalsRow: false,
+    style: 'brightdesk-green'
+  };
+  const payload = {
+    kind: 'sheets',
+    title: 'Sales',
+    activeWorksheetId: 'sales',
+    worksheets: [{
+      id: 'sales',
+      name: 'Sales',
+      cells: [['Product', 'Amount'], ['Pen', '10'], ['Paper', '20']],
+      tables: [table]
+    }]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.equal(imported.worksheets[0].tables.length, 1);
+    assert.equal(imported.worksheets[0].tables[0].name, 'SalesTable');
+    assert.deepEqual(imported.worksheets[0].tables[0].columns, ['Product', 'Amount']);
+    assert.deepEqual(imported.worksheets[0].tables[0].range, table.range);
+    assert.deepEqual(imported.worksheets[0].cells, payload.worksheets[0].cells);
+    assert.equal(imported.tables[0].name, 'SalesTable');
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('XLSX import preserves separate named tables across worksheets', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-multiple-tables-'));
+  const filePath = path.join(directory, 'two-tables.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Two tables',
+    activeWorksheetId: 'costs',
+    worksheets: [
+      { id: 'sales', name: 'Sales', cells: [['Product', 'Amount'], ['Pen', '10']], tables: [
+        { id: 'table-1', name: 'SalesTable', range: { top: 0, left: 0, bottom: 1, right: 1 }, columns: ['Product', 'Amount'], headerRow: true, totalsRow: false, style: 'brightdesk-green' }
+      ] },
+      { id: 'costs', name: 'Costs', cells: [['Item', 'Cost'], ['Rent', '500']], tables: [
+        { id: 'table-2', name: 'CostsTable', range: { top: 0, left: 0, bottom: 1, right: 1 }, columns: ['Item', 'Cost'], headerRow: true, totalsRow: false, style: 'brightdesk-green' }
+      ] }
+    ]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.deepEqual(imported.worksheets.map(sheet => sheet.tables.map(table => table.name)), [['SalesTable'], ['CostsTable']]);
+    assert.equal(imported.activeWorksheetId, 'sheet-2');
+    assert.equal(imported.tables[0].name, 'CostsTable');
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
