@@ -96,7 +96,10 @@ function applySheetHistory(direction) {
 }
 function persist() {
   try {
-    if (state.docs.sheets && Array.isArray(state.docs.sheets.worksheets)) workbookModel.syncActiveWorksheet(state.docs.sheets);
+    if (state.docs.sheets && Array.isArray(state.docs.sheets.worksheets)) {
+      sheetTables.synchronizeWorkbookTableHeaders(state.docs.sheets);
+      workbookModel.syncActiveWorksheet(state.docs.sheets);
+    }
     commonJsonStorage.writeJsonValue(localStorage, 'brightdesk-docs-v3', state.docs);
     setStatus('Saved on this device');
   } catch (error) { setStatus('Could not save locally'); console.error(error); }
