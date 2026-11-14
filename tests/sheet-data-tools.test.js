@@ -42,7 +42,7 @@ test('lists unique column values from the data area and includes blank cells', (
     ['West', '40'],
     ['East', '50']
   ];
-  assert.deepEqual(getUniqueColumnValues(cells, 0), ['', 'East', 'West']);
+  assert.deepEqual(getUniqueColumnValues(cells, 0), ['East', 'West', '']);
 });
 
 test('stores selected filter values immutably and clears one or all column filters', () => {
