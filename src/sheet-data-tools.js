@@ -9,6 +9,7 @@
   const MAX_FILTER_VALUES = 250_000;
   const MAX_CELL_TEXT = 32_767;
   const MAX_ROWS = 1_048_576;
+  const MAX_RANGE_CELLS = 250_000;
   const cellAddressPattern = /^([A-Z]{1,3})([1-9]\d*)$/i;
   const formulaReferencePattern = /(?<![A-Z0-9_.])(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]{1,3})([1-9]\d*)(?::([A-Z]{1,3})([1-9]\d*))?|(?<![A-Z0-9_.])([A-Z]{1,3})([1-9]\d*)(?::([A-Z]{1,3})([1-9]\d*))?/gi;
 
@@ -152,6 +153,17 @@
   function translateRangeReference(firstColumn, firstRowNumber, lastColumn, lastRowNumber, destinationBySourceRow, headerRow, prefix) {
     const firstRow = Number(firstRowNumber) - 1;
     const lastRow = Number(lastRowNumber) - 1;
+    const firstColumnIndex = columnIndex(firstColumn);
+    const lastColumnIndex = columnIndex(lastColumn);
+    const rowCount = Math.abs(lastRow - firstRow) + 1;
+    const columnCount = Math.abs(lastColumnIndex - firstColumnIndex) + 1;
+    if (!Number.isSafeInteger(firstRow) || !Number.isSafeInteger(lastRow) ||
+        firstRow < 0 || lastRow < 0 || firstRow >= MAX_ROWS || lastRow >= MAX_ROWS ||
+        firstColumnIndex < 0 || lastColumnIndex < 0 ||
+        firstColumnIndex >= MAX_COLUMNS || lastColumnIndex >= MAX_COLUMNS ||
+        rowCount > Math.floor(MAX_RANGE_CELLS / columnCount)) {
+      return prefix + firstColumn + firstRowNumber + ':' + lastColumn + lastRowNumber;
+    }
     const rowStep = firstRow <= lastRow ? 1 : -1;
     const targetRows = [];
 
