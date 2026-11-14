@@ -252,3 +252,18 @@ test('deleting the active worksheet restores the remaining worksheet tables', ()
   deleteWorksheet(workbook, 'second');
   assert.equal(workbook.tables[0].name, 'FirstTable');
 });
+
+test('rejects adding a worksheet once the workbook reaches 256 worksheets', () => {
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'sheet-256',
+    worksheets: Array.from({ length: 256 }, (_, index) => ({
+      id: `sheet-${index + 1}`,
+      name: `Sheet${index + 1}`,
+      cells: [['value']]
+    }))
+  });
+
+  assert.throws(() => addWorksheet(workbook), /256 worksheet/i);
+  assert.equal(workbook.worksheets.length, 256);
+  assert.equal(workbook.activeWorksheetId, 'sheet-256');
+});
