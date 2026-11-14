@@ -347,3 +347,79 @@ test('XLSX round trip preserves ISO date cells as dates with the selected displa
     assert.equal(imported.styles.A1.numberFormat, 'date');
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+
+
+test('Brightdesk project validation accepts saved worksheet filters and rejects unsafe filter criteria', () => {
+  const valid = {
+    docs: { sheets: {
+      activeWorksheetId: 'one',
+      worksheets: [{
+        id: 'one', name: 'Overview', cells: [['Region'], ['East'], ['West']],
+        autoFilter: { enabled: true, filters: { '0': ['East', ''] } }
+      }]
+    } }
+  };
+  assert.equal(validateProject(valid), valid);
+
+  const invalidWith = autoFilter => ({ docs: { sheets: {
+    activeWorksheetId: 'one',
+    worksheets: [{ id: 'one', name: 'Overview', cells: [['Region'], ['East']], autoFilter }]
+  } } });
+  assert.throws(() => validateProject(invalidWith({ enabled: 'yes', filters: {} })), /invalid worksheet filter/i);
+  assert.throws(() => validateProject(invalidWith({ enabled: true, filters: { '-1': ['East'] } })), /invalid worksheet filter/i);
+  assert.throws(() => validateProject(invalidWith({ enabled: true, filters: { '16384': ['East'] } })), /invalid worksheet filter/i);
+  assert.throws(() => validateProject(invalidWith({ enabled: true, filters: { '0': ['East', 3] } })), /invalid worksheet filter/i);
+  assert.throws(() => validateProject(invalidWith({ enabled: true, filters: [] })), /invalid worksheet filter/i);
+});
+
+test('Brightdesk project files preserve saved filter criteria for every worksheet', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-filtered-project-'));
+  const filePath = path.join(directory, 'filtered-workbook.bdesk');
+  const project = {
+    title: 'Filtered workbook',
+    docs: { sheets: {
+      activeWorksheetId: 'costs',
+      cells: [['Region'], ['East']],
+      autoFilter: { enabled: true, filters: { '0': ['East'] } },
+      worksheets: [
+        { id: 'sales', name: 'Sales', cells: [['Region'], ['West']], autoFilter: { enabled: true, filters: { '0': ['West'] } } },
+        { id: 'costs', name: 'Costs', cells: [['Region'], ['East']], autoFilter: { enabled: true, filters: { '0': ['East'] } } }
+      ]
+    } }
+  };
+  try {
+    await exportOfficeFile({ project }, filePath);
+    assert.deepEqual(await openOfficeFile(filePath), project);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('XLSX round trip preserves AutoFilter ranges and clearly resets local-only filter selections', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-filtered-xlsx-'));
+  const filePath = path.join(directory, 'filtered-workbook.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Filtered workbook',
+    activeWorksheetId: 'sales',
+    worksheets: [
+      {
+        id: 'sales', name: 'Sales',
+        cells: [['Region', 'Amount'], ['East', 100], ['West', 200]],
+        autoFilter: { enabled: true, filters: { '0': ['East'] } }
+      },
+      {
+        id: 'costs', name: 'Costs',
+        cells: [['Type', 'Amount'], ['Rent', 500], ['Wages', 700]],
+        autoFilter: { enabled: false, filters: {} }
+      }
+    ]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.equal(imported.worksheets[0].autoFilter.enabled, true);
+    assert.deepEqual(imported.worksheets[0].autoFilter.filters, {});
+    assert.deepEqual(imported.worksheets[0].cells, payload.worksheets[0].cells);
+    assert.equal(imported.worksheets[1].autoFilter.enabled, false);
+    assert.deepEqual(imported.worksheets[1].cells, payload.worksheets[1].cells);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
