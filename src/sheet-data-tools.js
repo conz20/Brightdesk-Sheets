@@ -10,7 +10,7 @@
   const MAX_CELL_TEXT = 32_767;
   const MAX_ROWS = 1_048_576;
   const cellAddressPattern = /^([A-Z]{1,3})([1-9]\d*)$/i;
-  const formulaReferencePattern = /(?<![A-Z0-9_.])(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]{1,3})([1-9]\d*)|(?<![A-Z0-9_.])([A-Z]{1,3})([1-9]\d*)/gi;
+  const formulaReferencePattern = /(?<![A-Z0-9_.])(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]{1,3})([1-9]\d*)(?::([A-Z]{1,3})([1-9]\d*))?|(?<![A-Z0-9_.])([A-Z]{1,3})([1-9]\d*)(?::([A-Z]{1,3})([1-9]\d*))?/gi;
 
   function createAutoFilterState() {
     return { enabled: false, filters: {} };
@@ -149,28 +149,38 @@
     return indexes;
   }
 
-  function translateFormulaRow(value, destinationBySourceRow, worksheetName, headerRow = 0) {
+  function translateFormulaRow(value, destinationBySourceRow, worksheetName, headerRow = 0, includeUnqualified = true) {
     const formula = String(value ?? '');
     if (!formula.startsWith('=') || !(destinationBySourceRow instanceof Map)) return formula;
     return formula.replace(formulaReferencePattern,
-      (match, quotedSheet, plainSheet, crossColumn, crossRow, localColumn, localRow) => {
-        const explicitSheet = quotedSheet !== undefined
-          ? quotedSheet.replace(/''/g, "'")
-          : plainSheet;
-        if (explicitSheet &&
-            (!worksheetName || explicitSheet.toLocaleLowerCase() !== String(worksheetName).toLocaleLowerCase())) {
+      (match, quotedSheet, plainSheet, crossColumn, crossRow, crossLastColumn, crossLastRow, localColumn, localRow, localLastColumn, localLastRow) => {
+        const explicitSheet = quotedSheet !== undefined ? quotedSheet.replace(/''/g, "'") : plainSheet;
+        if ((!explicitSheet && !includeUnqualified) ||
+            (explicitSheet && (!worksheetName || explicitSheet.toLocaleLowerCase() !== String(worksheetName).toLocaleLowerCase()))) {
           return match;
         }
-        const column = crossColumn || localColumn;
-        const sourceRow = Number(crossRow || localRow) - 1;
-        if (sourceRow <= headerRow || !destinationBySourceRow.has(sourceRow)) return match;
-        const targetRow = destinationBySourceRow.get(sourceRow);
-        const targetAddress = column + (targetRow + 1);
-        if (quotedSheet !== undefined) return "'" + quotedSheet + "'!" + targetAddress;
-        if (plainSheet) return plainSheet + '!' + targetAddress;
-        return targetAddress;
+        const firstColumn = crossColumn || localColumn;
+        const firstRow = Number(crossRow || localRow) - 1;
+        const targetFirstRow = firstRow > headerRow ? destinationBySourceRow.get(firstRow) : undefined;
+        const firstAddress = firstColumn + (targetFirstRow === undefined ? firstRow + 1 : targetFirstRow + 1);
+        const lastColumn = crossLastColumn || localLastColumn;
+        const lastRowNumber = crossLastRow || localLastRow;
+        let address = firstAddress;
+        if (lastColumn && lastRowNumber) {
+          const lastRow = Number(lastRowNumber) - 1;
+          const targetLastRow = lastRow > headerRow ? destinationBySourceRow.get(lastRow) : undefined;
+          address += ':' + lastColumn + (targetLastRow === undefined ? lastRow + 1 : targetLastRow + 1);
+        }
+        if (quotedSheet !== undefined) return "'" + quotedSheet + "'!" + address;
+        if (plainSheet) return plainSheet + '!' + address;
+        return address;
       });
   }
+
+  function translateExternalFormulaRow(value, destinationBySourceRow, worksheetName, headerRow = 0) {
+    return translateFormulaRow(value, destinationBySourceRow, worksheetName, headerRow, false);
+  }
+
 
   function parseCellAddress(address) {
     const match = String(address).match(cellAddressPattern);
@@ -229,7 +239,7 @@
       const targetAddress = parsed.columnLabel + (targetRow + 1);
       nextStyles[targetAddress] = style && typeof style === 'object' ? { ...style } : style;
     }
-    return { cells: nextCells, styles: nextStyles };
+    return { cells: nextCells, styles: nextStyles, destinationBySourceRow };
   }
 
   return {
@@ -243,6 +253,7 @@
     clearAllColumnFilters,
     getVisibleRowIndexes,
     translateFormulaRow,
+    translateExternalFormulaRow,
     sortWorksheet
   };
 });
