@@ -66,11 +66,15 @@
   }
 
   function parseReference(reference) {
-    const match = String(reference).trim().match(/^(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]+)([1-9]\\d*)$|^([A-Z]+)([1-9]\\d*)$/i);
-    if (!match) throw new Error('Invalid cell reference');
-    const sheetName = match[1] ? match[1].replace(/''/g, "'") : (match[2] || null);
-    const columnLabel = match[3] || match[5];
-    const rowNumber = Number(match[4] || match[6]);
+    const value = String(reference).trim();
+    const crossSheet = value.match(/^(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]+)([1-9]\d*)$/i);
+    const localSheet = value.match(/^([A-Z]+)([1-9]\d*)$/i);
+    if (!crossSheet && !localSheet) throw new Error('Invalid cell reference');
+    const sheetName = crossSheet
+      ? (crossSheet[1] ? crossSheet[1].replace(/''/g, "'") : crossSheet[2])
+      : null;
+    const columnLabel = crossSheet ? crossSheet[3] : localSheet[1];
+    const rowNumber = Number(crossSheet ? crossSheet[4] : localSheet[2]);
     const col = columnIndex(columnLabel);
     const row = rowNumber - 1;
     if (col < 0 || col >= MAX_COLUMNS || row < 0 || row >= MAX_ROWS) throw new Error('Cell reference is outside the supported range');
@@ -78,13 +82,17 @@
   }
 
   function parseRange(reference) {
-    const match = String(reference).trim().match(/^(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]+)([1-9]\\d*)(?::([A-Z]+)([1-9]\\d*))$|^([A-Z]+)([1-9]\\d*)(?::([A-Z]+)([1-9]\\d*))$/i);
-    if (!match) return null;
-    const sheetName = match[1] ? match[1].replace(/''/g, "'") : (match[2] || null);
-    const firstColumn = match[3] || match[8];
-    const firstRowNumber = Number(match[4] || match[9]);
-    const lastColumn = match[5] || match[10];
-    const lastRowNumber = Number(match[6] || match[11]);
+    const value = String(reference).trim();
+    const crossSheet = value.match(/^(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]+)([1-9]\d*):([A-Z]+)([1-9]\d*)$/i);
+    const localSheet = value.match(/^([A-Z]+)([1-9]\d*):([A-Z]+)([1-9]\d*)$/i);
+    if (!crossSheet && !localSheet) return null;
+    const sheetName = crossSheet
+      ? (crossSheet[1] ? crossSheet[1].replace(/''/g, "'") : crossSheet[2])
+      : null;
+    const firstColumn = crossSheet ? crossSheet[3] : localSheet[1];
+    const firstRowNumber = Number(crossSheet ? crossSheet[4] : localSheet[2]);
+    const lastColumn = crossSheet ? crossSheet[5] : localSheet[3];
+    const lastRowNumber = Number(crossSheet ? crossSheet[6] : localSheet[4]);
     const firstCol = columnIndex(firstColumn);
     const lastCol = columnIndex(lastColumn);
     const firstRow = firstRowNumber - 1;
@@ -127,7 +135,8 @@
     }
 
     function getRef(reference, sheetName = null) {
-      const parsed = parseReference(sheetName ? `${sheetName.includes("'") ? `'${sheetName.replace(/'/g, "''")}'` : sheetName}!${reference}` : reference);
+      const parsed = parseReference(reference);
+      if (sheetName) parsed.sheetName = sheetName;
       const target = resolveWorksheet(parsed.sheetName);
       return calculateCell(target.cells, parsed.row, parsed.col, stack, {
         ...context,
