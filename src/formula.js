@@ -15,8 +15,16 @@
     if (typeof value !== 'string') return null;
     const text = value.trim();
     if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) return null;
+
+    // Keep text identifiers and values Excel cannot represent exactly as text.
+    if (/^[+-]?0\d/.test(text)) return null;
+    const mantissa = text.split(/[eE]/, 1)[0].replace(/^[+-]/, '');
+    const significantDigits = mantissa.replace('.', '').replace(/^0+/, '').length;
+    if (significantDigits > 15) return null;
+
     const number = Number(text);
-    return Number.isFinite(number) ? number : null;
+    if (!Number.isFinite(number) || (number === 0 && significantDigits > 0)) return null;
+    return number;
   }
 
   function arithmetic(expression) {
