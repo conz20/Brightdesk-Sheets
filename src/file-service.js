@@ -330,7 +330,8 @@ async function openOfficeFile(filePath) {
       sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
         rows[rowNumber - 1] = [];
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          rows[rowNumber - 1][colNumber - 1] = cell.formula ? `=${cell.formula}` : (cell.value?.result ?? cell.value ?? '');
+          const value = cell.value?.result ?? cell.value ?? '';
+          rows[rowNumber - 1][colNumber - 1] = cell.formula ? `=${cell.formula}` : (value instanceof Date ? value.toISOString().slice(0, 10) : value);
           const style = readExcelCellStyle(cell);
           if (style) styles[`${columnLabel(colNumber)}${rowNumber}`] = style;
         });
@@ -443,7 +444,7 @@ async function exportOfficeFile(payload, filePath) {
         if (typeof value === 'string' && value.startsWith('=')) cell.value = { formula: value.slice(1) };
         else cell.value = value === '' || value == null ? null : (Number.isFinite(Number(value)) && String(value).trim() !== '' ? Number(value) : value);
         const address = `${columnLabel(c + 1)}${r + 1}`;
-        applyExcelCellStyle(cell, source.styles?.[address] || (index === 0 ? payload.styles?.[address] : null));
+        applyExcelCellStyle(cell, source.styles?.[address] || (index === activeTab ? payload.styles?.[address] : null));
       }));
       sheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 1 }];
       sheet.columns.forEach(col => { col.width = 16; });
@@ -497,6 +498,13 @@ function applyExcelCellStyle(cell, style) {
     percent: '0.00%',
     date: 'dd/mm/yyyy'
   };
+  if (style.numberFormat === 'date' && typeof cell.value === 'string') {
+    const match = cell.value.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+    if (match) {
+      const date = new Date(cell.value + 'T00:00:00.000Z');
+      if (Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === cell.value) cell.value = date;
+    }
+  }
   if (style.numberFormat && formats[style.numberFormat]) cell.numFmt = formats[style.numberFormat];
 }
 
