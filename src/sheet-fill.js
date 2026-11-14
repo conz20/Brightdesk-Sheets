@@ -61,7 +61,7 @@
     if (!Number.isInteger(rowOffset) || !Number.isInteger(columnOffset)) {
       throw new TypeError('Formula fill offsets must be whole numbers.');
     }
-    const referencePattern = /(?:(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!)?([A-Z]{1,3})([1-9]\d*)(?::([A-Z]{1,3})([1-9]\d*))?/gi;
+    const referencePattern = /(?<![A-Z0-9_.])(?:(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!)?([A-Z]{1,3})([1-9]\d*)(?::([A-Z]{1,3})([1-9]\d*))?/gi;
     return '=' + formula.slice(1).replace(referencePattern, (match, quotedSheet, plainSheet, firstColumn, firstRow, lastColumn, lastRow) => {
       const prefix = quotedSheet !== undefined ? "'" + quotedSheet + "'!" : (plainSheet ? plainSheet + '!' : '');
       const first = shiftReference(firstColumn, firstRow, rowOffset, columnOffset);
