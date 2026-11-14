@@ -172,10 +172,15 @@ function assertTableCollection(tables, rows, options = {}) {
       throw new Error('The Brightdesk Sheets workbook contains invalid table columns.');
     }
     const columnNames = new Set();
-    for (const column of table.columns) {
+    for (let index = 0; index < table.columns.length; index += 1) {
+      const column = table.columns[index];
       const key = column.toLocaleLowerCase();
       if (columnNames.has(key)) throw new Error('The Brightdesk Sheets workbook contains duplicate table column names.');
       columnNames.add(key);
+      const savedHeader = rows[range.top][range.left + index];
+      if (String(savedHeader ?? '').trim() !== column) {
+        throw new Error('The Brightdesk Sheets table columns must match their worksheet header cells.');
+      }
     }
     if (table.headerRow !== undefined && table.headerRow !== true) {
       throw new Error('The Brightdesk Sheets workbook contains an invalid table header setting.');
@@ -611,6 +616,7 @@ async function exportOfficeFile(payload, filePath) {
         rows,
         { names: workbookTableNames, ids: workbookTableIds }
       );
+      let exportedTableCount = 0;
       for (const table of worksheetTables) {
         if (table.headerRow === false || table.totalsRow === true) continue;
         const tableRows = [];
@@ -631,11 +637,12 @@ async function exportOfficeFile(payload, filePath) {
           columns: table.columns.map(name => ({ name, filterButton: true })),
           rows: tableRows
         });
+        exportedTableCount += 1;
       }
 
       const filterState = assertAutoFilterState(source.autoFilter ?? (index === activeTab ? payload.autoFilter : undefined));
       const filterColumnCount = rows.reduce((maximum, row) => Math.max(maximum, row.length), 0);
-      if (filterState.enabled && rows.length > 0 && filterColumnCount > 0 && worksheetTables.length === 0) {
+      if (filterState.enabled && rows.length > 0 && filterColumnCount > 0 && exportedTableCount === 0) {
         sheet.autoFilter = `A1:${columnLabel(filterColumnCount)}${rows.length}`;
       }
       sheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 1 }];
