@@ -664,6 +664,7 @@ test('XLSX imports apply Brightdesk table colours even when the source only cont
 test('XLSX round trip keeps table column names in sync after a header cell edit', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-edited-table-header-'));
   const filePath = path.join(directory, 'edited-header.xlsx');
+  const projectPath = path.join(directory, 'edited-header.bdesk');
   const cells = [['Product', 'Amount'], ['Pen', 10], ['Paper', 20]];
   const workbook = {
     title: 'Sales',
@@ -688,6 +689,24 @@ test('XLSX round trip keeps table column names in sync after a header cell edit'
     assert.equal(updated.id, table.id);
     assert.deepEqual(updated.columns, ['Product', 'Revenue']);
     assert.deepEqual(workbook.cells[0], ['Product', 'Revenue']);
+
+    const project = {
+      title: workbook.title,
+      docs: {
+        sheets: {
+          title: workbook.title,
+          activeWorksheetId: workbook.activeWorksheetId,
+          cells: workbook.cells,
+          styles: workbook.styles,
+          tables: workbook.tables,
+          worksheets: workbook.worksheets
+        }
+      }
+    };
+    await exportOfficeFile({ project }, projectPath);
+    const reopenedProject = await openOfficeFile(projectPath);
+    assert.deepEqual(reopenedProject.docs.sheets.worksheets[0].cells[0], ['Product', 'Revenue']);
+    assert.deepEqual(reopenedProject.docs.sheets.worksheets[0].tables[0].columns, ['Product', 'Revenue']);
 
     await exportOfficeFile({
       kind: 'sheets',
