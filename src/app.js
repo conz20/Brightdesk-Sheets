@@ -50,7 +50,11 @@ if (!sheetNavigation) throw new Error('Brightdesk sheet navigation helpers were 
 
 function clone(value) { return commonJsonStorage.cloneJsonValue(value); }
 function activeDoc() { return state.docs[state.app]; }
-function setStatus(message) { $('save-status').textContent = message; }
+function setStatus(message) {
+  $('save-status').textContent = message;
+  const sheetMessage = $('sheet-status-message');
+  if (sheetMessage) sheetMessage.textContent = message;
+}
 function persist() {
   try {
     if (state.docs.sheets && Array.isArray(state.docs.sheets.worksheets)) workbookModel.syncActiveWorksheet(state.docs.sheets);
@@ -979,7 +983,9 @@ function render() {
     const isDatabase = state.app === 'database';
     const isWorkspace = state.app === 'loop';
     $('todo-wrap').hidden = !isTodo; $('lists-wrap').hidden = !isLists; $('forms-wrap').hidden = !isForms; $('planner-wrap').hidden = !isPlanner; $('database-wrap').hidden = !isDatabase; $('workspace-app-wrap').hidden = !isWorkspace;
+    $('sheet-formula-bar').hidden = state.app !== 'sheets';
     $('sheet-tabs').hidden = state.app !== 'sheets';
+    $('sheet-status-bar').hidden = state.app !== 'sheets';
     $('open-button').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('save-project').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('export-button').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace;
     document.querySelector('.document-bar').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('ribbon-tabs').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('toolbar').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace;
     editor.hidden = !['pages'].includes(state.app); sheetWrap.hidden = state.app !== 'sheets'; slideWrap.hidden = state.app !== 'slides'; notesWrap.hidden = !['notes'].includes(state.app);
@@ -987,7 +993,8 @@ function render() {
     if (state.app === 'pages') applyPageLayout(); else editor.removeAttribute('style');
     $('notes-editor').value = state.app === 'notes' ? (doc.text || '') : '';
     updateDocumentLanguage();
-    if (state.app === 'sheets') renderSheet(); if (state.app === 'slides') renderSlides();
+    if (state.app === 'sheets') { renderSheet(); applySheetZoom(); updateSheetFormulaBar(); }
+    if (state.app === 'slides') renderSlides();
     if (isTodo) renderTodoWorkspace();
     else if (isLists) renderListsWorkspace();
     else if (isForms) window.BrightdeskFormsUI.render();
@@ -1055,6 +1062,7 @@ function importProject(data){
     state.docs.sheets = workbookModel.normalizeWorkbook({
       title: data.title || 'Imported spreadsheet', cells, worksheets, activeWorksheetId: data.activeWorksheetId
     }, defaults.sheets.cells);
+    state.selectedCell = { row: 0, col: 0 };
   }
   if(kind==='slides')state.docs.slides={title:data.title||'Imported presentation',slides:data.slides||clone(defaults.slides.slides),current:0};
   if(kind==='notes')state.docs.notes={title:data.title||'Imported note',text:data.text||''};
