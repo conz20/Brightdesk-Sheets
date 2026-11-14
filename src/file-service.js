@@ -274,12 +274,17 @@ async function openOfficeFile(filePath) {
       worksheets.push({ id: `sheet-${index + 1}`, name, cells: rows });
     });
     if (!worksheets.length) return { kind: 'sheets', title: path.basename(filePath, ext), cells: [[]] };
+    const requestedActiveTab = Number(workbook.views?.[0]?.activeTab);
+    const activeIndex = Number.isInteger(requestedActiveTab) && requestedActiveTab >= 0 && requestedActiveTab < worksheets.length
+      ? requestedActiveTab
+      : 0;
+    const activeWorksheet = worksheets[activeIndex];
     return {
       kind: 'sheets',
       title: path.basename(filePath, ext),
-      cells: worksheets[0].cells,
+      cells: activeWorksheet.cells,
       worksheets,
-      activeWorksheetId: worksheets[0].id
+      activeWorksheetId: activeWorksheet.id
     };
   }
   if (ext === '.csv' || ext === '.tsv') {
@@ -353,6 +358,11 @@ async function exportOfficeFile(payload, filePath) {
     if (sourceSheets.length > MAX_WORKSHEETS) throw new Error('The workbook exceeds the 256-worksheet limit.');
     const usedNames = new Set();
     let workbookCellCount = 0;
+    let activeTab = 0;
+    if (payload.activeWorksheetId) {
+      const foundIndex = sourceSheets.findIndex(source => source?.id === payload.activeWorksheetId);
+      if (foundIndex >= 0) activeTab = foundIndex;
+    }
     sourceSheets.forEach((source, index) => {
       const name = assertWorksheetName(source?.name || (index === 0 ? payload.title || 'Sheet1' : `Sheet${index + 1}`), usedNames);
       const rows = source?.cells || (index === 0 ? payload.rows || [] : []);
@@ -368,6 +378,7 @@ async function exportOfficeFile(payload, filePath) {
       sheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 1 }];
       sheet.columns.forEach(col => { col.width = 16; });
     });
+    workbook.views = [{ activeTab, firstSheet: 0, visibility: 'visible' }];
     await workbook.xlsx.writeFile(filePath); return;
   }
   if (kind === 'sheets' && ext === '.csv') {
