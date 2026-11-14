@@ -99,11 +99,11 @@ function assertCellStyles(styles) {
 
 function hasExcelAutoFilterRange(value) {
   if (typeof value === 'string') {
-    return /^\\$?[A-Z]{1,3}\\$?[1-9]\\d*:\\$?[A-Z]{1,3}\\$?[1-9]\\d*$/i.test(value);
+    return /^\$?[A-Z]{1,3}\$?[1-9]\d*:\$?[A-Z]{1,3}\$?[1-9]\d*$/i.test(value);
   }
   if (!isPlainObject(value) || value.from == null || value.to == null) return false;
   const isAddress = item => typeof item === 'string'
-    ? /^\\$?[A-Z]{1,3}\\$?[1-9]\\d*$/i.test(item)
+    ? /^\$?[A-Z]{1,3}\$?[1-9]\d*$/i.test(item)
     : isPlainObject(item) && Number.isInteger(item.row) && Number.isInteger(item.column) &&
       item.row > 0 && item.column > 0;
   return isAddress(value.from) && isAddress(value.to);
