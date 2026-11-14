@@ -40,6 +40,18 @@ The product README currently describes:
 
 The current product is an Electron desktop project using Node.js 24.22.2. Its existing test command is explicitly listed in `package.json`; use that exact command rather than assuming a generic test runner. Rust integration work must be preserved where present. Do not replace the current implementation with GridCraft's pure-Rust architecture.
 
+## Current draft implementation: selection, formatting, clipboard and fill
+
+The same review branch also introduces:
+
+- Rectangular selection by Shift-click, with a visible selected range and cell count.
+- Cell and range formatting for bold, italic, underline, safe text/fill colours and basic number formats.
+- Copy/cut of selected cell blocks and paste of quoted tab/newline clipboard blocks. Clipboard parsing and paste size are bounded to protect workbook memory.
+- Fill Down and Fill Right, copying from the first selected row/column and translating supported relative A1 cell and range references.
+- Bounded undo/redo history for cell changes, formatting, row/column additions, sorting and worksheet operations.
+
+Clipboard paste preserves formula text but does not translate its relative references or copy cell styles. Fill Down/Right does translate the supported relative reference subset. Neither behaviour implies full Excel formula compatibility. The draft still needs exact-head Node.js 24.22.2 tests and native desktop verification.
+
 ## Current draft implementation: filtering and safe sorting
 
 The active multi-worksheet review branch is extending the P1 editing scope with:
