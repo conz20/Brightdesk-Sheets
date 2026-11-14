@@ -153,8 +153,8 @@
   function translateRangeReference(firstColumn, firstRowNumber, lastColumn, lastRowNumber, destinationBySourceRow, headerRow, prefix) {
     const firstRow = Number(firstRowNumber) - 1;
     const lastRow = Number(lastRowNumber) - 1;
-    const firstColumnIndex = columnIndex(firstColumn);
-    const lastColumnIndex = columnIndex(lastColumn);
+    const firstColumnIndex = parseCellAddress(firstColumn + '1')?.column ?? -1;
+    const lastColumnIndex = parseCellAddress(lastColumn + '1')?.column ?? -1;
     const rowCount = Math.abs(lastRow - firstRow) + 1;
     const columnCount = Math.abs(lastColumnIndex - firstColumnIndex) + 1;
     if (!Number.isSafeInteger(firstRow) || !Number.isSafeInteger(lastRow) ||
