@@ -138,3 +138,17 @@ test('deleting the active worksheet restores the remaining worksheet formatting'
   deleteWorksheet(workbook, 'second');
   assert.deepEqual(workbook.styles, { A1: { bold: true } });
 });
+  
+test('applies legacy top-level formatting to the selected active worksheet', () => {
+  const workbook = normalizeWorkbook({
+    activeWorksheetId: 'costs',
+    styles: { B1: { numberFormat: 'currency' } },
+    worksheets: [
+      { id: 'sales', name: 'Sales', cells: [['100']] },
+      { id: 'costs', name: 'Costs', cells: [['25', '10']] }
+    ]
+  });
+  assert.deepEqual(workbook.styles, { B1: { numberFormat: 'currency' } });
+  assert.deepEqual(workbook.worksheets[0].styles, {});
+  assert.deepEqual(workbook.worksheets[1].styles, { B1: { numberFormat: 'currency' } });
+});
