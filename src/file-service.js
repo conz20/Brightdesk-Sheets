@@ -582,6 +582,7 @@ function toExcelCellValue(value) {
 
   if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed)) return value;
   const numeric = Number(value);
+  if (numeric === 0 && significantDigits > 0) return value;
   return Number.isFinite(numeric) ? numeric : value;
 }
 
