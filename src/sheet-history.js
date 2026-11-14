@@ -5,33 +5,72 @@ function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function measureSnapshot(value) {
+  return JSON.stringify(value).length * 2;
+}
+
+function trimSnapshots(history, side) {
+  const snapshots = history[side];
+  const bytesKey = side === 'past' ? 'pastBytes' : 'futureBytes';
+  while (snapshots.length > history.limit || history.pastBytes + history.futureBytes > history.maxBytes) {
+    if (!snapshots.length) break;
+    const removed = snapshots.shift();
+    history[bytesKey] -= removed.bytes;
+  }
+}
+
 function createHistory(options = {}) {
   const limit = Number.isInteger(options.limit) && options.limit > 0 ? options.limit : 100;
+  const maxBytes = Number.isInteger(options.maxBytes) && options.maxBytes > 0 ? options.maxBytes : 32 * 1024 * 1024;
   const clone = typeof options.clone === 'function' ? options.clone : cloneValue;
-  return { limit, clone, past: [], future: [] };
+  return { limit, maxBytes, clone, past: [], future: [], pastBytes: 0, futureBytes: 0 };
 }
 
 function capture(history, snapshot) {
   if (!history || !Array.isArray(history.past) || !Array.isArray(history.future)) {
     throw new TypeError('A valid Brightdesk sheet history is required.');
   }
-  history.past.push(history.clone(snapshot));
-  if (history.past.length > history.limit) history.past.splice(0, history.past.length - history.limit);
+  const copy = history.clone(snapshot);
+  const bytes = measureSnapshot(copy);
   history.future.length = 0;
-  return history.past.length;
+  history.futureBytes = 0;
+  if (bytes > history.maxBytes) {
+    history.past.length = 0;
+    history.pastBytes = 0;
+    return false;
+  }
+  history.past.push({ value: copy, bytes });
+  history.pastBytes += bytes;
+  trimSnapshots(history, 'past');
+  return true;
 }
 
 function undo(history, current) {
   if (!canUndo(history)) return null;
-  history.future.push(history.clone(current));
-  return history.clone(history.past.pop());
+  const entry = history.past.pop();
+  history.pastBytes -= entry.bytes;
+  const copy = history.clone(current);
+  const bytes = measureSnapshot(copy);
+  if (bytes <= history.maxBytes) {
+    history.future.push({ value: copy, bytes });
+    history.futureBytes += bytes;
+    trimSnapshots(history, 'future');
+  }
+  return history.clone(entry.value);
 }
 
 function redo(history, current) {
   if (!canRedo(history)) return null;
-  history.past.push(history.clone(current));
-  if (history.past.length > history.limit) history.past.shift();
-  return history.clone(history.future.pop());
+  const entry = history.future.pop();
+  history.futureBytes -= entry.bytes;
+  const copy = history.clone(current);
+  const bytes = measureSnapshot(copy);
+  if (bytes <= history.maxBytes) {
+    history.past.push({ value: copy, bytes });
+    history.pastBytes += bytes;
+    trimSnapshots(history, 'past');
+  }
+  return history.clone(entry.value);
 }
 
 function canUndo(history) {
