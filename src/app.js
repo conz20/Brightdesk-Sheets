@@ -324,7 +324,12 @@ function updateSheetFormulaBar() {
   if (nameBox && document.activeElement !== nameBox) nameBox.value = address;
   if (formula && document.activeElement !== formula) formula.value = cellRaw(state.selectedCell.row, state.selectedCell.col);
   const selection = $('sheet-status-selection');
-  if (selection) selection.textContent = `Cell ${address}`;
+  if (selection) {
+    const range = currentSheetRange();
+    const start = sheetNavigation.formatCellAddress(range.top, range.left);
+    const end = sheetNavigation.formatCellAddress(range.bottom, range.right);
+    selection.textContent = range.cellCount > 1 ? `Range ${start}:${end} · ${range.cellCount} cells` : `Cell ${address}`;
+  }
   const dimensions = $('sheet-status-size');
   if (dimensions) {
     const rows = activeDoc().cells || [];
