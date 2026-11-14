@@ -48,11 +48,23 @@ These are configured build targets, not confirmation that a package has passed i
 ## Current first-use workflows
 
 - Edit values in a spreadsheet grid and use the formula bar.
+- Work across named worksheets: add, switch, rename, reorder and delete tabs. The final worksheet cannot be deleted. Renaming a worksheet also updates supported formulas that refer to its old name, including quoted sheet names and ranges.
+- Navigate directly to a cell with the Name Box, edit its raw value or formula in a dedicated formula bar, and adjust worksheet zoom from the status bar.
+- Shift-click to select a rectangular range of cells. Format the selected cell or range as bold, italic or underlined; choose a safe text/fill colour; and display numbers as Number, Currency (AUD), Percentage or Date. Formatting is kept separately for each worksheet.
+- Use Fill Down or Fill Right on a selected range to repeat the first row or column. Supported relative cell and range references move with the filled formula.
+- Copy or cut selected cells and paste rectangular tab-separated blocks from other spreadsheet programs with Ctrl+C, Ctrl+X and Ctrl+V. Shift-click selects a block; paste starts at its top-left cell. Clipboard imports are quoted-field aware and bounded by the worksheet cell limit.
+- Undo and redo spreadsheet edits with the Home ribbon or Ctrl+Z / Ctrl+Y, including cell changes, row/column additions, sorting and worksheet management.
+- Existing single-grid workbooks migrate to a first worksheet without changing their saved cell values.
 - Calculate basic arithmetic and supported range functions, including SUM, AVERAGE, MIN, MAX, COUNT and COUNTA.
-- Add rows and columns, sort a selected column, and work with supported CSV and XLSX import/export.
-- Keep the current workbook data on the device as part of the Brightdesk project.
+- Add rows and columns within the 250,000-cell worksheet limit, sort data rows while keeping the first row as the header, and import/export CSV and XLSX files. Sorting keeps cell formatting with its row and remaps same-worksheet formula references to the rows those formulas originally referenced. It also updates formulas on other worksheets that explicitly refer to the sorted sheet, including cell and range references. When a sort separates the rows in a referenced range, the formula is split into explicit cell or range arguments so it does not include unrelated records.
+- Turn on column filters from the Data tab. Each header dropdown supports searching and multi-selecting distinct values, including blanks; filters across columns combine together, and all filter settings are kept separately for each worksheet.
+- Create a structured table from a selected range with **Insert > Table**, or use **Format as Table** on the Data tab. Tables get a workbook-wide unique name, cleaned column headers and Brightdesk green header/banded-row styling. Editing or pasting over a table header updates the saved column names before the workbook is saved, and duplicate or blank headers are made unique. Use **Rename Table** to change its name or **Convert to Range** to remove table behaviour while keeping cell values and formatting. Brightdesk project files preserve table definitions and styling; XLSX carries the named table and styles; CSV carries cell data only.
+- Save filter selections in the local Brightdesk project. XLSX import/export carries the standard AutoFilter range and dropdowns, while Brightdesk-specific selected values are kept in the local project format and reset when an XLSX is imported. CSV continues to contain only cell data for one worksheet. XLSX rich-text cells and hyperlinks import as their visible text, and Excel error cells import as their displayed error string; hyperlink destinations and character-level rich-text formatting are not retained.
+- Keep workbook data and worksheet names on the device as part of the Brightdesk project.
 
-**Known boundaries:** This is a basic spreadsheet foundation. Do not assume VBA/macros, pivot tables, advanced formula coverage, complex workbook features or exact Excel round-trip compatibility.
+**Implementation status:** The current draft branch adds worksheet management, A1 Name Box navigation, a dedicated formula bar, keyboard movement (Enter, Tab and arrow keys), bounded undo/redo history, cell formatting, local cell copy/cut and multi-cell clipboard paste, and direct cross-worksheet references. It supports SUM, AVERAGE, MIN, MAX, COUNT and COUNTA across worksheet ranges, including quoted worksheet names. The newest draft work adds structured tables with workbook-wide unique names, cleaned headers, Brightdesk green styling and Insert/Data tab actions; searchable multi-select column filters with per-worksheet saved criteria; safe sorting that keeps the header and row formatting aligned; same-worksheet formula-reference remapping after a sort, plus updates to explicit cross-worksheet cell and range references when their source sheet is sorted. Non-contiguous references are split so their original records are preserved. It also adds Fill Down and Fill Right, including relative reference adjustment for the supported A1-style formula subset. Add Row and Add Column now enforce the same worksheet size limit before changing the workbook. These changes are implemented on the review branch only; they are not yet release-verified. Exact-head automated checks, ExcelJS round-trip tests and native desktop verification must pass before the expanded scope is treated as accepted.
+
+**Known boundaries:** This is not full Excel compatibility. VBA/macros, pivot tables, charts and broad advanced-function coverage are not established. Clipboard copy/cut and paste transfer cell contents (including formula text), not cell formatting; relative formula references are not adjusted when a multi-cell clipboard block is pasted. Fill Down/Right adjusts relative references in the supported formula subset; this is not a full Excel formula translator and absolute-reference syntax is not currently supported. A cut clears cell contents but leaves the original cell formatting in place. CSV does not retain formatting. Complex workbook fidelity and exact Excel round-trip compatibility remain unverified. XLSX rich-text runs are flattened to plain cell text, hyperlink URLs are not retained, and rich-text error objects are reduced to their visible error text.
 ## Download
 
 The latest desktop installers are published from this repository’s verified release workflow when a release is approved.
@@ -89,7 +101,7 @@ Use win on Windows or linux on Linux instead of mac.
 
 ## Project structure
 
-- src/ — Brightdesk desktop renderer and product modules.
+- src/ — Brightdesk desktop renderer and product modules, including `src/workbook-model.js` for workbook migration and worksheet management.
 - `assets/icons/sheets.svg` — original Brightdesk Sheets application icon.
 - `assets/previews/sheets-workspace.svg` — workspace interface design.
 - scripts/ — build and release verification tools.
