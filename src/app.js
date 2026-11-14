@@ -932,6 +932,16 @@ function sortSheetColumn(descending) {
   });
   doc.cells = sorted.cells;
   doc.styles = sorted.styles;
+  if (worksheet?.name && sorted.destinationBySourceRow instanceof Map) {
+    for (const otherWorksheet of doc.worksheets || []) {
+      if (otherWorksheet.id === doc.activeWorksheetId || !Array.isArray(otherWorksheet.cells)) continue;
+      otherWorksheet.cells = otherWorksheet.cells.map(row => Array.isArray(row)
+        ? row.map(value => typeof value === 'string'
+          ? sheetDataTools.translateExternalFormulaRow(value, sorted.destinationBySourceRow, worksheet.name)
+          : value)
+        : row);
+    }
+  }
   persist();
   keepSelectedSheetCellVisible();
   renderSheet();
