@@ -32,7 +32,11 @@ const installableCatalog = catalog.filter(item => item.availability === 'availab
 const state = {
   app: launchAppId || 'pages', view: 'workspace', docs: structuredClone(defaults),
   todoView: 'my-day', todoQuery: '',
-  selectedCell: { row: 0, col: 0 }, update: null, ribbonTab: 'home',
+  selectedCell: { row: 0, col: 0 },
+  selectionAnchor: { row: 0, col: 0 },
+  selectedRange: { top: 0, left: 0, bottom: 0, right: 0, rowCount: 1, columnCount: 1, cellCount: 1 },
+  pendingMouseSelection: false, extendSelectionOnClick: false,
+  update: null, ribbonTab: 'home',
   installedApps: [], setupComplete: false, firstRunSelection: new Set(installableCatalog.map(item => item.id)),
   slideTheme: 'lavender', focusMode: false, editorZoom: 100, sheetZoom: 100,
   languageCatalog: [], installedLanguagePacks: [], spellCheckerLanguages: [], usesNativeMacSpellChecker: false,
@@ -47,12 +51,14 @@ const sheetNavigation = window.BrightdeskSheetNavigation;
 const sheetHistory = window.BrightdeskSheetHistory;
 const cellFormatting = window.BrightdeskCellFormatting;
 const sheetClipboard = window.BrightdeskSheetClipboard;
+const sheetRange = window.BrightdeskSheetRange;
 if (!commonJsonStorage) throw new Error('Brightdesk common storage helper was not loaded.');
 if (!workbookModel) throw new Error('Brightdesk worksheet model was not loaded.');
 if (!sheetNavigation) throw new Error('Brightdesk sheet navigation helpers were not loaded.');
 if (!sheetHistory) throw new Error('Brightdesk sheet history helpers were not loaded.');
 if (!cellFormatting) throw new Error('Brightdesk cell formatting helpers were not loaded.');
 if (!sheetClipboard) throw new Error('Brightdesk sheet clipboard helpers were not loaded.');
+if (!sheetRange) throw new Error('Brightdesk worksheet range helpers were not loaded.');
 const workbookHistory = sheetHistory.createHistory({ limit: 100, clone });
 
 function clone(value) { return commonJsonStorage.cloneJsonValue(value); }
@@ -172,6 +178,45 @@ function applySelectedCellStyle(changes) {
   renderSheet();
   renderToolbar();
   setStatus(`Formatting applied to ${address}`);
+}
+function currentSheetRange() {
+  return sheetRange.normalizeRange(state.selectedRange || {
+    top: state.selectedCell.row, left: state.selectedCell.col,
+    bottom: state.selectedCell.row, right: state.selectedCell.col
+  });
+}
+function applySheetRangeHighlight() {
+  const range = currentSheetRange();
+  sheetWrap.querySelectorAll('input.grid-cell').forEach(input => {
+    const row = Number(input.dataset.row), col = Number(input.dataset.col);
+    const selected = row >= range.top && row <= range.bottom && col >= range.left && col <= range.right;
+    input.classList.toggle('in-selected-range', selected);
+    input.setAttribute('aria-selected', String(selected));
+  });
+}
+function resetSheetSelection(row = 0, col = 0) {
+  state.selectedCell = { row, col };
+  state.selectionAnchor = { row, col };
+  state.selectedRange = sheetRange.rangeFromCells(state.selectedCell, state.selectedCell);
+  state.pendingMouseSelection = false;
+  state.extendSelectionOnClick = false;
+}
+function selectedSheetClipboardGrid() {
+  const range = currentSheetRange();
+  const grid = sheetRange.extractRangeValues(activeDoc().cells || [], range);
+  const active = document.activeElement;
+  if (active && active.classList && active.classList.contains('grid-cell') && active.dataset.edited === 'true') {
+    const row = Number(active.dataset.row), col = Number(active.dataset.col);
+    if (row >= range.top && row <= range.bottom && col >= range.left && col <= range.right) {
+      grid[row - range.top][col - range.left] = active.value;
+    }
+  }
+  return grid;
+}
+function selectedRangeStatus(verb, range) {
+  return range.rowCount === 1 && range.columnCount === 1
+    ? verb + ' ' + sheetNavigation.formatCellAddress(range.top, range.left)
+    : verb + ' ' + range.rowCount + ' rows × ' + range.columnCount + ' columns';
 }
 function selectedCellClipboardValue() {
   const { row, col } = state.selectedCell;
