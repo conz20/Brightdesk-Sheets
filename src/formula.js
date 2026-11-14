@@ -53,7 +53,11 @@
         return value;
       }
       const value = Number(token);
-      if (!Number.isFinite(value)) throw new Error('Invalid number');
+      const mantissa = String(token).split(/[eE]/, 1)[0].replace(/^[+-]/, '');
+      const significantDigits = mantissa.replace('.', '').replace(/^0+/, '').length;
+      if (!Number.isFinite(value) || significantDigits > 15 || (value === 0 && significantDigits > 0)) {
+        throw new Error('Invalid number');
+      }
       return value;
     }
     function term() {
