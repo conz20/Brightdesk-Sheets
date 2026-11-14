@@ -128,3 +128,10 @@ test('numeric cell values remain available to direct references and aggregate fo
   assert.equal(calculateCell(cells, 0, 4), 11.5);
   assert.equal(calculateCell(cells, 0, 5), 2);
 });
+
+test('supports scientific notation constants without confusing exponent digits for cell references', () => {
+  const cells = [['=1e3 + 2.5e-1', '3', '=A1+1e2']];
+
+  assert.equal(calculateCell(cells, 0, 0), 1000.25);
+  assert.equal(calculateCell(cells, 0, 2), 1100);
+});
