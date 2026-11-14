@@ -90,3 +90,18 @@ test('saving worksheet edits reconciles structured table headers before local pe
   assert.ok(handler.includes('sheetTables.synchronizeWorkbookTableHeaders(state.docs.sheets)'));
   assert.ok(handler.indexOf('sheetTables.synchronizeWorkbookTableHeaders(') < handler.indexOf('workbookModel.syncActiveWorksheet('));
 });
+
+
+test('renaming a worksheet refreshes the grid and toolbar after updating formula references', () => {
+  const app = read('src/app.js');
+  const start = app.indexOf('function renameWorksheetFromPrompt(');
+  const end = app.indexOf('function deleteWorksheetWithConfirmation(', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = app.slice(start, end);
+  assert.ok(handler.includes('recordSheetHistory()'));
+  assert.ok(handler.includes('workbookModel.renameWorksheet('));
+  assert.ok(handler.includes('renderSheetTabs()'));
+  assert.ok(handler.includes('renderSheet()'));
+  assert.ok(handler.includes('renderToolbar()'));
+  assert.ok(handler.includes('persist()'));
+});
