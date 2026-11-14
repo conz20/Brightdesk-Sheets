@@ -565,6 +565,24 @@ function htmlToBlocks(html) {
   const noTags = stripped.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
   return noTags.split(/\n+/).map(text => text.trim()).filter(Boolean);
 }
+function toExcelCellValue(value) {
+  if (value === '' || value == null) return null;
+  if (typeof value !== 'string') return value;
+  if (value.startsWith('=')) return { formula: value.slice(1) };
+
+  const trimmed = value.trim();
+  if (!trimmed) return value;
+
+  // Keep identifiers and high-precision numbers as text rather than silently
+  // stripping leading zeroes or rounding them to Excel's 15-digit precision.
+  if (/^[+-]?0\\d/.test(trimmed)) return value;
+  const significantDigits = trimmed.replace(/[^0-9]/g, '').replace(/^0+/, '').length;
+  if (significantDigits > 15) return value;
+
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : value;
+}
+
 async function exportOfficeFile(payload, filePath) {
   const kind = payload.kind;
   const ext = path.extname(filePath).toLowerCase();
@@ -609,8 +627,7 @@ async function exportOfficeFile(payload, filePath) {
       const sheet = workbook.addWorksheet(name);
       rows.forEach((row, r) => row.forEach((value, c) => {
         const cell = sheet.getCell(r + 1, c + 1);
-        if (typeof value === 'string' && value.startsWith('=')) cell.value = { formula: value.slice(1) };
-        else cell.value = value === '' || value == null ? null : (Number.isFinite(Number(value)) && String(value).trim() !== '' ? Number(value) : value);
+        cell.value = toExcelCellValue(value);
         const address = `${columnLabel(c + 1)}${r + 1}`;
         applyExcelCellStyle(cell, source.styles?.[address] || (index === activeTab ? payload.styles?.[address] : null));
       }));
@@ -624,12 +641,7 @@ async function exportOfficeFile(payload, filePath) {
         if (table.headerRow === false || table.totalsRow === true) continue;
         const tableRows = [];
         for (let row = table.range.top + 1; row <= table.range.bottom; row += 1) {
-          tableRows.push(rows[row].slice(table.range.left, table.range.right + 1).map(value => {
-            if (typeof value === 'string' && value.startsWith('=')) return { formula: value.slice(1) };
-            if (value === '' || value == null) return null;
-            if (typeof value === 'string' && Number.isFinite(Number(value)) && value.trim() !== '') return Number(value);
-            return value;
-          }));
+          tableRows.push(rows[row].slice(table.range.left, table.range.right + 1).map(toExcelCellValue));
         }
         sheet.addTable({
           name: table.name,
