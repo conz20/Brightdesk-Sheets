@@ -173,14 +173,14 @@ test('sorting does not rewrite scientific-notation exponents as cell references'
   const cells = [
     ['Name', 'Calculation'],
     ['B', '=1E3+A3'],
-    ['A', '=1E3+A2']
+    ['A', '=2.5E-1+A2']
   ];
 
   const result = sortWorksheet(cells, {}, 0, { worksheetName: 'Sales' });
 
   assert.deepEqual(result.cells, [
     ['Name', 'Calculation'],
-    ['A', '=1E3+A2'],
-    ['B', '=1E3+A3']
+    ['A', '=2.5E-1+A3'],
+    ['B', '=1E3+A2']
   ]);
 });
