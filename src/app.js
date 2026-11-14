@@ -111,7 +111,13 @@ function safeHtml(html) {
 }
 function letter(n) { let result = ''; for (n++; n > 0; n = Math.floor((n - 1) / 26)) result = String.fromCharCode(65 + (n - 1) % 26) + result; return result; }
 function cellRaw(row, col) { return String(activeDoc().cells?.[row]?.[col] ?? ''); }
-function cellNumeric(row, col) { return window.BrightdeskFormula.calculateCell(activeDoc().cells || [], row, col); }
+function cellNumeric(row, col) {
+  const doc = activeDoc();
+  return window.BrightdeskFormula.calculateCell(doc.cells || [], row, col, new Set(), {
+    worksheets: Array.isArray(doc.worksheets) ? doc.worksheets : [],
+    activeWorksheetId: doc.activeWorksheetId
+  });
+}
 function colIndex(label) { return window.BrightdeskFormula.columnIndex(label); }
 function updateSheetFormulaBar() {
   if (state.app !== 'sheets') return;
