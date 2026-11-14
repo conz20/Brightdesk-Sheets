@@ -264,6 +264,12 @@ function pasteIntoSelectedSheetCell(event) {
     const clipboardGrid = sheetClipboard.parseClipboardGrid(text);
     const range = currentSheetRange();
     const row = range.top, col = range.left;
+    const activeInput = document.activeElement;
+    if (activeInput?.classList?.contains('grid-cell') && activeInput.dataset.edited === 'true') {
+      const editedRow = Number(activeInput.dataset.row), editedCol = Number(activeInput.dataset.col);
+      activeDoc().cells[editedRow][editedCol] = activeInput.value;
+      activeInput.dataset.edited = 'false';
+    }
     const nextCells = sheetClipboard.pasteClipboardGrid(activeDoc().cells, row, col, clipboardGrid);
     const activeId = activeDoc().activeWorksheetId;
     const otherCellCount = activeDoc().worksheets
@@ -274,8 +280,6 @@ function pasteIntoSelectedSheetCell(event) {
       throw new RangeError('The paste would exceed the 250,000-cell workbook limit.');
     }
     recordSheetHistory();
-    const activeInput = document.activeElement;
-    if (activeInput?.classList?.contains('grid-cell')) activeInput.dataset.edited = 'false';
     activeDoc().cells = nextCells;
     persist();
     renderSheet();
