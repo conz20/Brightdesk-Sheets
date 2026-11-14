@@ -167,3 +167,20 @@ test('keeps local formula references attached to the same logical rows after sor
     ['C', '=A2*2', "='Sales'!A2", "='Budget'!A3"]
   ]);
 });
+
+
+test('sorting does not rewrite scientific-notation exponents as cell references', () => {
+  const cells = [
+    ['Name', 'Calculation'],
+    ['B', '=1E3+A3'],
+    ['A', '=1E3+A2']
+  ];
+
+  const result = sortWorksheet(cells, {}, 0, { worksheetName: 'Sales' });
+
+  assert.deepEqual(result.cells, [
+    ['Name', 'Calculation'],
+    ['A', '=1E3+A2'],
+    ['B', '=1E3+A3']
+  ]);
+});
