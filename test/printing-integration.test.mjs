@@ -28,7 +28,8 @@ test("Printing snapshot is the dependency-free approved upstream version",()=>{
 test("the Sheets workspace contains shared Print actions",()=>{
  const html=read("src/index.html"),app=read("src/app.js"),main=read("src/main.js"),preload=read("src/preload.js");
  assert.match(html,/id="print-button"/);assert.match(html,/id="printer-settings-button"/);
- assert.ok(app.includes("window.brightdesk.printing.print({ printBackground: true })"));
+ assert.ok(app.includes('const printRequest = { printBackground: true, orientation: "landscape" };'));
+ assert.ok(app.includes("window.brightdesk.printing.print(printRequest)"));
  assert.ok(app.includes("window.brightdesk.printing.openPrinterSettings()"));
  assert.match(main,/registerPrintingIpcHandlers/);
  assert.match(preload,/printing:list-printers/);
