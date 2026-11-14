@@ -45,7 +45,7 @@ test('pastes a rectangular clipboard block into the selected cell without mutati
 
 test('rejects clipboard pastes that exceed the 250,000-cell worksheet limit', () => {
   const source = Array.from({ length: 500 }, () => Array(500).fill(''));
-  assert.throws(() => pasteClipboardGrid(source, 0, 0, [['x']]), /250,000-cell limit/i);
+  assert.throws(() => pasteClipboardGrid(source, 0, 500, [['x']]), /250,000-cell limit/i);
   assert.throws(() => pasteClipboardGrid([['a']], 0, 0, Array.from({ length: 501 }, () => Array(500).fill('x'))), /250,000-cell limit/i);
 });
 
