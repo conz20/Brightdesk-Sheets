@@ -363,7 +363,7 @@ function jumpToSheetCell(reference) {
     setStatus(error.message);
     return false;
   }
-  state.selectedCell = target;
+  resetSheetSelection(target.row, target.col);
   persist();
   renderSheet();
   renderToolbar();
