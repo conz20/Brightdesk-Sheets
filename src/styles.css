@@ -331,3 +331,41 @@
   .sheet-status-left{flex-wrap:wrap;gap:6px 10px}
   .sheet-status-left span+span{border-left:0;padding-left:0}
 }
+
+
+/* Brightdesk Sheets cell formatting controls */
+.sheet-format-control{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:3px;
+  min-width:78px;
+  color:#647084;
+  font-size:10px;
+  font-weight:650;
+}
+.sheet-format-control select{
+  width:100%;
+  min-width:0;
+  border:1px solid #dfe4ec;
+  border-radius:6px;
+  background:#fff;
+  color:#334258;
+  padding:6px 7px;
+  font:inherit;
+  font-size:10px;
+}
+.sheet-format-control select:focus-visible{
+  outline:2px solid #27845C;
+  outline-offset:2px;
+}
+#toolbar .tool[aria-pressed="true"]{
+  background:#edf7f1;
+  border-color:#9cc5ac;
+  color:#1e6847;
+  font-weight:750;
+}
+@media(max-width:900px){
+  #toolbar{flex-wrap:wrap}
+  .sheet-format-control{min-width:72px}
+}
