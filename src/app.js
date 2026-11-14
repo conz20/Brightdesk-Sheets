@@ -43,8 +43,10 @@ const editor = $('editor'), sheetWrap = $('sheet-wrap'), slideWrap = $('slide-wr
 const pageLayout = window.BrightdeskPageLayout;
 const commonJsonStorage = window.BrightdeskCommonLibs;
 const workbookModel = window.BrightdeskWorkbookModel;
+const sheetNavigation = window.BrightdeskSheetNavigation;
 if (!commonJsonStorage) throw new Error('Brightdesk common storage helper was not loaded.');
 if (!workbookModel) throw new Error('Brightdesk worksheet model was not loaded.');
+if (!sheetNavigation) throw new Error('Brightdesk sheet navigation helpers were not loaded.');
 
 function clone(value) { return commonJsonStorage.cloneJsonValue(value); }
 function activeDoc() { return state.docs[state.app]; }
@@ -107,6 +109,45 @@ function letter(n) { let result = ''; for (n++; n > 0; n = Math.floor((n - 1) / 
 function cellRaw(row, col) { return String(activeDoc().cells?.[row]?.[col] ?? ''); }
 function cellNumeric(row, col) { return window.BrightdeskFormula.calculateCell(activeDoc().cells || [], row, col); }
 function colIndex(label) { return window.BrightdeskFormula.columnIndex(label); }
+function updateSheetFormulaBar() {
+  if (state.app !== 'sheets') return;
+  const nameBox = $('sheet-name-box');
+  const formula = $('formula-input');
+  const address = sheetNavigation.formatCellAddress(state.selectedCell.row, state.selectedCell.col);
+  if (nameBox && document.activeElement !== nameBox) nameBox.value = address;
+  if (formula && document.activeElement !== formula) formula.value = cellRaw(state.selectedCell.row, state.selectedCell.col);
+  const selection = $('sheet-status-selection');
+  if (selection) selection.textContent = `Cell ${address}`;
+  const dimensions = $('sheet-status-size');
+  if (dimensions) {
+    const rows = activeDoc().cells || [];
+    dimensions.textContent = `${rows.length} rows × ${Math.max(12, ...rows.map(row => row.length))} columns`;
+  }
+  const zoom = $('sheet-zoom-value');
+  if (zoom) zoom.textContent = `${state.sheetZoom}%`;
+}
+function jumpToSheetCell(reference) {
+  let target;
+  try {
+    target = sheetNavigation.parseCellAddress(reference);
+    sheetNavigation.ensureCellExists(activeDoc().cells, target.row, target.col);
+  } catch (error) {
+    setStatus(error.message);
+    return false;
+  }
+  state.selectedCell = target;
+  persist();
+  renderSheet();
+  renderToolbar();
+  const input = sheetWrap.querySelector(`input[data-row="${target.row}"][data-col="${target.col}"]`);
+  if (input) {
+    input.focus({ preventScroll: true });
+    input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+  updateSheetFormulaBar();
+  setStatus(`Selected ${sheetNavigation.formatCellAddress(target.row, target.col)}`);
+  return true;
+}
 const ribbonTabs = {
   pages: ['home', 'insert', 'layout', 'review', 'view'],
   sheets: ['home', 'insert', 'formulas', 'data', 'view'],
@@ -184,10 +225,6 @@ function renderToolbar() {
     }
   } else if (app === 'sheets') {
     if (tab === 'home') {
-      const cell = group('cell');
-      const ref = document.createElement('span'); ref.className = 'cell-ref'; ref.textContent = `${letter(state.selectedCell.col)}${state.selectedCell.row + 1}`; cell.append(ref);
-      const formula = document.createElement('input'); formula.id = 'formula-input'; formula.className = 'formula-input'; formula.placeholder = label('enterValue'); formula.value = cellRaw(state.selectedCell.row, state.selectedCell.col);
-      formula.addEventListener('change', () => { setCell(state.selectedCell.row, state.selectedCell.col, formula.value); refreshSheetValues(); }); cell.append(formula);
       const grid = group('cells'); addButton(grid, `+ ${label('row')}`, () => addSheetRow()); addButton(grid, `+ ${label('column')}`, () => addSheetColumn());
     } else if (tab === 'insert') {
       const insert = group('tools'); addButton(insert, label('newRow'), addSheetRow); addButton(insert, label('newColumn'), addSheetColumn);
@@ -372,8 +409,7 @@ function refreshSheetValues() {
     const row = Number(input.dataset.row), col = Number(input.dataset.col);
     input.value = String(cellNumeric(row, col));
   });
-  const formula = $('formula-input');
-  if (formula && document.activeElement !== formula) formula.value = cellRaw(state.selectedCell.row, state.selectedCell.col);
+  updateSheetFormulaBar();
 }
 function renderSheet() {
   const rows = activeDoc().cells || (activeDoc().cells = clone(defaults.sheets.cells));
@@ -384,12 +420,13 @@ function renderSheet() {
   const tbody=document.createElement('tbody');
   rows.forEach((row,r)=>{const tr=document.createElement('tr'),th=document.createElement('th');th.textContent=String(r+1);tr.append(th);
     for(let c=0;c<maxCols;c++){const td=document.createElement('td'),input=document.createElement('input');input.className='grid-cell';input.value=String(cellNumeric(r,c));input.dataset.row=r;input.dataset.col=c;input.setAttribute('aria-label',`${letter(c)}${r+1}`);input.lang=state.proofingLanguage;
-      input.addEventListener('focus',()=>{state.selectedCell={row:r,col:c};renderToolbar();});
+      input.addEventListener('focus',()=>{state.selectedCell={row:r,col:c};renderToolbar();updateSheetFormulaBar();});
       input.addEventListener('change',()=>{setCell(r,c,input.value);refreshSheetValues();});
       input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();setCell(r,c,input.value);const next=sheetWrap.querySelector(`input[data-row="${r+1}"][data-col="${c}"]`);next?.focus();refreshSheetValues();}});td.append(input);tr.append(td);}
     tbody.append(tr);
   }); table.append(tbody); sheetWrap.innerHTML=''; sheetWrap.append(table);
   renderSheetTabs();
+  updateSheetFormulaBar();
 }
 function renderSlides() {
   const doc=activeDoc(); if(!Array.isArray(doc.slides)||!doc.slides.length)doc.slides=[{title:t('common.newSlide'),body:''}];
@@ -1039,6 +1076,23 @@ $('check-current-document').addEventListener('click',checkCurrentDocumentSpellin
 $('back-to-apps').addEventListener('click',()=>{state.view=state.setupComplete?'workspace':'manager';render();});
 $('finish-app-setup').addEventListener('click',()=>{if(state.setupComplete){state.view='workspace';render();}else completeAppSetup();});
 $('doc-title').addEventListener('change',()=>{activeDoc().title=$('doc-title').value;persist();});
+$('sheet-name-box').addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const moved = jumpToSheetCell(event.currentTarget.value);
+    if (!moved) event.currentTarget.select();
+  }
+});
+$('sheet-name-box').addEventListener('change', event => {
+  if (document.activeElement === event.currentTarget) jumpToSheetCell(event.currentTarget.value);
+});
+$('formula-input').addEventListener('change', event => {
+  setCell(state.selectedCell.row, state.selectedCell.col, event.currentTarget.value);
+  refreshSheetValues();
+});
+$('sheet-zoom-out').addEventListener('click', () => changeSheetZoom(-10));
+$('sheet-zoom-in').addEventListener('click', () => changeSheetZoom(10));
+$('sheet-zoom-reset').addEventListener('click', () => { state.sheetZoom = 100; applySheetZoom(); updateSheetFormulaBar(); });
 editor.addEventListener('input',()=>{activeDoc().html=editor.innerHTML;persist();});
 $('notes-editor').addEventListener('input',()=>{activeDoc().text=$('notes-editor').value;persist();});
 $('todo-create-form').addEventListener('submit', createTodoTask);
