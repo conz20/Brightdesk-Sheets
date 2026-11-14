@@ -86,3 +86,15 @@ test('returns a formula error for references to unknown worksheets', () => {
     activeWorksheetId: 'summary'
   }), '#VALUE!');
 });
+
+
+test('rejects formula ranges larger than the bounded evaluation limit', () => {
+  const worksheets = [
+    { id: 'data', name: 'Data', cells: [['1']] },
+    { id: 'summary', name: 'Summary', cells: [['=SUM(Data!A1:XFD1048576)']] }
+  ];
+  assert.equal(calculateCell(worksheets[1].cells, 0, 0, new Set(), {
+    worksheets,
+    activeWorksheetId: 'summary'
+  }), '#VALUE!');
+});
