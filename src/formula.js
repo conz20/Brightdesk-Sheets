@@ -1,11 +1,16 @@
 (function (root) {
+  const MAX_ROWS = 1_048_576;
+  const MAX_COLUMNS = 16_384;
+  const MAX_RANGE_CELLS = 250_000;
+
   function columnIndex(label) {
     let value = 0;
     for (const ch of label.toUpperCase()) value = value * 26 + ch.charCodeAt(0) - 64;
     return value - 1;
   }
+
   function arithmetic(expression) {
-    const tokens = expression.match(/\d+(?:\.\d+)?|[()+\-*/%]/g) || [];
+    const tokens = expression.match(/\\d+(?:\\.\\d+)?|[()+\\-*/%]/g) || [];
     let at = 0;
     function factor() {
       const token = tokens[at++];
@@ -41,53 +46,141 @@
     if (at !== tokens.length) throw new Error('Invalid formula');
     return value;
   }
-  function calculateCell(cells, row, col, stack = new Set()) {
+
+  function splitArguments(value) {
+    const result = [];
+    let start = 0;
+    let quoted = false;
+    for (let index = 0; index < value.length; index++) {
+      if (value[index] === "'") {
+        if (quoted && value[index + 1] === "'") { index += 1; continue; }
+        quoted = !quoted;
+      } else if (value[index] === ',' && !quoted) {
+        result.push(value.slice(start, index).trim());
+        start = index + 1;
+      }
+    }
+    if (quoted) throw new Error('Invalid quoted worksheet name');
+    result.push(value.slice(start).trim());
+    return result;
+  }
+
+  function parseReference(reference) {
+    const match = String(reference).trim().match(/^(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]+)([1-9]\\d*)$|^([A-Z]+)([1-9]\\d*)$/i);
+    if (!match) throw new Error('Invalid cell reference');
+    const sheetName = match[1] ? match[1].replace(/''/g, "'") : (match[2] || null);
+    const columnLabel = match[3] || match[5];
+    const rowNumber = Number(match[4] || match[6]);
+    const col = columnIndex(columnLabel);
+    const row = rowNumber - 1;
+    if (col < 0 || col >= MAX_COLUMNS || row < 0 || row >= MAX_ROWS) throw new Error('Cell reference is outside the supported range');
+    return { sheetName, row, col };
+  }
+
+  function parseRange(reference) {
+    const match = String(reference).trim().match(/^(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]+)([1-9]\\d*)(?::([A-Z]+)([1-9]\\d*))$|^([A-Z]+)([1-9]\\d*)(?::([A-Z]+)([1-9]\\d*))$/i);
+    if (!match) return null;
+    const sheetName = match[1] ? match[1].replace(/''/g, "'") : (match[2] || null);
+    const firstColumn = match[3] || match[8];
+    const firstRowNumber = Number(match[4] || match[9]);
+    const lastColumn = match[5] || match[10];
+    const lastRowNumber = Number(match[6] || match[11]);
+    const firstCol = columnIndex(firstColumn);
+    const lastCol = columnIndex(lastColumn);
+    const firstRow = firstRowNumber - 1;
+    const lastRow = lastRowNumber - 1;
+    if (firstCol < 0 || lastCol < 0 || firstCol >= MAX_COLUMNS || lastCol >= MAX_COLUMNS ||
+        firstRow < 0 || lastRow < 0 || firstRow >= MAX_ROWS || lastRow >= MAX_ROWS) {
+      throw new Error('Cell range is outside the supported spreadsheet range');
+    }
+    const rowCount = Math.abs(lastRow - firstRow) + 1;
+    const columnCount = Math.abs(lastCol - firstCol) + 1;
+    if (rowCount * columnCount > MAX_RANGE_CELLS) throw new Error('Formula range exceeds the 250,000-cell limit');
+    return {
+      sheetName,
+      firstRow: Math.min(firstRow, lastRow),
+      lastRow: Math.max(firstRow, lastRow),
+      firstCol: Math.min(firstCol, lastCol),
+      lastCol: Math.max(firstCol, lastCol)
+    };
+  }
+
+  function calculateCell(cells, row, col, stack = new Set(), context = {}) {
     const raw = String(cells?.[row]?.[col] ?? '').trim();
     if (!raw.startsWith('=')) return raw !== '' && Number.isFinite(Number(raw)) ? Number(raw) : (raw || '');
-    const id = `${row}:${col}`;
+
+    const currentSheetId = context.activeWorksheetId || '__current__';
+    const id = `${currentSheetId}:${row}:${col}`;
     if (stack.has(id)) return '#CYCLE!';
     stack.add(id);
-    const getRef = (ref) => {
-      const match = String(ref).trim().match(/^([A-Z]+)(\d+)$/i);
-      if (!match) throw new Error('Invalid cell reference');
-      return calculateCell(cells, Number(match[2]) - 1, columnIndex(match[1]), stack);
-    };
-    const getRange = (range) => {
-      const match = String(range).trim().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/i);
-      if (!match) return [getRef(range)];
-      const c1 = columnIndex(match[1]), c2 = columnIndex(match[3]);
-      const r1 = Number(match[2]) - 1, r2 = Number(match[4]) - 1;
+
+    function resolveWorksheet(sheetName) {
+      if (!sheetName) {
+        return { id: currentSheetId, name: context.activeWorksheetName || '', cells };
+      }
+      const target = Array.isArray(context.worksheets)
+        ? context.worksheets.find(sheet => String(sheet.name || '').toLocaleLowerCase() === sheetName.toLocaleLowerCase())
+        : null;
+      if (!target || !Array.isArray(target.cells)) throw new Error(`Worksheet not found: ${sheetName}`);
+      if (target.id === currentSheetId) return { id: currentSheetId, name: target.name, cells };
+      return { id: target.id || target.name, name: target.name, cells: target.cells };
+    }
+
+    function getRef(reference, sheetName = null) {
+      const parsed = parseReference(sheetName ? `${sheetName.includes("'") ? `'${sheetName.replace(/'/g, "''")}'` : sheetName}!${reference}` : reference);
+      const target = resolveWorksheet(parsed.sheetName);
+      return calculateCell(target.cells, parsed.row, parsed.col, stack, {
+        ...context,
+        activeWorksheetId: target.id,
+        activeWorksheetName: target.name
+      });
+    }
+
+    function getRange(reference) {
+      const parsed = parseRange(reference);
+      if (!parsed) return [getRef(reference)];
+      const target = resolveWorksheet(parsed.sheetName);
       const values = [];
-      for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
-        for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) values.push(calculateCell(cells, r, c, stack));
+      for (let r = parsed.firstRow; r <= parsed.lastRow; r++) {
+        for (let c = parsed.firstCol; c <= parsed.lastCol; c++) {
+          const result = calculateCell(target.cells, r, c, stack, {
+            ...context,
+            activeWorksheetId: target.id,
+            activeWorksheetName: target.name
+          });
+          if (typeof result === 'string' && result.startsWith('#')) throw new Error('Referenced cell contains an error');
+          values.push(result);
+        }
       }
       return values;
-    };
+    }
+
     try {
       const formula = raw.slice(1).trim();
-      const fn = formula.match(/^(SUM|AVERAGE|MIN|MAX|COUNT|COUNTA)\((.*)\)$/i);
+      const fn = formula.match(/^(SUM|AVERAGE|MIN|MAX|COUNT|COUNTA)\\((.*)\\)$/i);
       let result;
       if (fn) {
-        const values = fn[2].split(',').flatMap(getRange);
+        const values = splitArguments(fn[2]).flatMap(getRange);
         const numbers = values
           .filter(value => value !== '' && value !== null && value !== undefined && !(typeof value === 'string' && value.trim() === ''))
           .map(Number)
           .filter(Number.isFinite);
         switch (fn[1].toUpperCase()) {
-          case 'SUM': result = numbers.reduce((sum, n) => sum + n, 0); break;
-          case 'AVERAGE': result = numbers.length ? numbers.reduce((sum, n) => sum + n, 0) / numbers.length : 0; break;
-          case 'MIN': result = numbers.length ? Math.min(...numbers) : 0; break;
-          case 'MAX': result = numbers.length ? Math.max(...numbers) : 0; break;
+          case 'SUM': result = numbers.reduce((sum, number) => sum + number, 0); break;
+          case 'AVERAGE': result = numbers.length ? numbers.reduce((sum, number) => sum + number, 0) / numbers.length : 0; break;
+          case 'MIN': result = numbers.length ? numbers.reduce((smallest, number) => Math.min(smallest, number), Infinity) : 0; break;
+          case 'MAX': result = numbers.length ? numbers.reduce((largest, number) => Math.max(largest, number), -Infinity) : 0; break;
           case 'COUNT': result = numbers.length; break;
-          case 'COUNTA': result = values.filter(v => v !== '' && v !== null && v !== undefined).length; break;
+          case 'COUNTA': result = values.filter(value => value !== '' && value !== null && value !== undefined).length; break;
         }
       } else {
-        const expression = formula.replace(/([A-Z]+\d+)/gi, ref => {
-          const value = getRef(ref);
+        const referencePattern = /(?:'((?:[^']|'')+)'|([A-Z_][A-Z0-9_.]*))!([A-Z]+[1-9]\\d*)|([A-Z]+[1-9]\\d*)/gi;
+        const expression = formula.replace(referencePattern, (match, quotedSheet, plainSheet, crossSheetAddress, localAddress) => {
+          const value = getRef(crossSheetAddress || localAddress, quotedSheet ? quotedSheet.replace(/''/g, "'") : (plainSheet || null));
           if (typeof value !== 'number') throw new Error('Cell is not numeric');
           return String(value);
         });
-        if (!/^[\d\s.+\-*/()%]+$/.test(expression)) throw new Error('Unsupported expression');
+        if (!/^[\\d\\s.+\\-*/()%]+$/.test(expression)) throw new Error('Unsupported expression');
         result = arithmetic(expression);
       }
       return Number.isFinite(result) ? Number(result.toFixed(8)) : '#VALUE!';
@@ -97,6 +190,7 @@
       stack.delete(id);
     }
   }
+
   const api = { columnIndex, arithmetic, calculateCell };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.BrightdeskFormula = api;
