@@ -244,6 +244,24 @@ function excelColorToHex(colour) {
   return /^[0-9a-f]{6}$/i.test(hex) ? `#${hex.toUpperCase()}` : null;
 }
 
+function readExcelCellValue(cell) {
+  if (cell.formula) return `=${cell.formula}`;
+  const value = cell.value;
+  if (value == null) return '';
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value !== 'object') return value;
+
+  if (Array.isArray(value.richText)) {
+    return value.richText.map(segment => String(segment?.text ?? '')).join('');
+  }
+  if (typeof value.text === 'string' && typeof value.hyperlink === 'string') {
+    return value.text;
+  }
+  if (typeof value.error === 'string') return value.error;
+
+  throw new Error('This XLSX file contains an unsupported cell value. Save the cell as text or a standard number and try again.');
+}
+
 function readExcelCellStyle(cell) {
   const style = {
     bold: cell.font?.bold === true,
@@ -466,8 +484,7 @@ async function openOfficeFile(filePath) {
       sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
         rows[rowNumber - 1] = [];
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          const value = cell.value?.result ?? cell.value ?? '';
-          rows[rowNumber - 1][colNumber - 1] = cell.formula ? `=${cell.formula}` : (value instanceof Date ? value.toISOString().slice(0, 10) : value);
+          rows[rowNumber - 1][colNumber - 1] = readExcelCellValue(cell);
           const style = readExcelCellStyle(cell);
           if (style) styles[`${columnLabel(colNumber)}${rowNumber}`] = style;
         });
