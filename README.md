@@ -137,3 +137,7 @@ Pull-request product tests and README checks run on Brightdesk's private macOS A
 ## Application identity
 
 The Electron main process validates the configured product ID against the shared ten-product catalogue exported by `src/standalone-downloads.js`. The startup import is covered by `tests/main-product-catalog.test.js`, which guards the approved product list so unsupported IDs cannot enter the product launch path.
+
+## Test discovery
+
+`npm test` uses Node.js 24's built-in automatic test discovery (`node --test`). It runs discovered test files under `tests/`, including newly added regression tests, without maintaining a manually curated file list. Platform-specific installer acceptance must still be run on the relevant native operating system; a macOS test run does not verify Windows or Linux installer behaviour.
