@@ -171,13 +171,16 @@ function applyCellVisualStyle(input, row, col) {
   input.style.color = style.color || '';
 }
 function applySelectedCellStyle(changes) {
-  const address = selectedCellAddress();
+  const range = currentSheetRange();
+  const currentStyles = activeDoc().styles || {};
+  const nextStyles = cellFormatting.updateCellStylesInRange(currentStyles, range, changes);
+  if (JSON.stringify(nextStyles) === JSON.stringify(currentStyles)) return;
   recordSheetHistory();
-  activeDoc().styles = cellFormatting.updateCellStyle(activeDoc().styles || {}, address, changes);
+  activeDoc().styles = nextStyles;
   persist();
   renderSheet();
   renderToolbar();
-  setStatus(`Formatting applied to ${address}`);
+  setStatus(selectedRangeStatus('Formatted', range));
 }
 function currentSheetRange() {
   return sheetRange.normalizeRange(state.selectedRange || {
@@ -295,14 +298,16 @@ function pasteIntoSelectedSheetCell(event) {
   }
 }
 function clearSelectedCellStyle() {
-  const address = selectedCellAddress();
-  if (!activeDoc().styles?.[address]) return;
+  const range = currentSheetRange();
+  const currentStyles = activeDoc().styles || {};
+  const nextStyles = cellFormatting.removeCellStylesInRange(currentStyles, range);
+  if (Object.keys(nextStyles).length === Object.keys(currentStyles).length) return;
   recordSheetHistory();
-  activeDoc().styles = cellFormatting.removeCellStyle(activeDoc().styles || {}, address);
+  activeDoc().styles = nextStyles;
   persist();
   renderSheet();
   renderToolbar();
-  setStatus(`Formatting cleared from ${address}`);
+  setStatus(selectedRangeStatus('Formatting cleared from', range));
 }
 function addCellStyleSelect(container, labelText, options, value, onChange) {
   const wrapper = document.createElement('label');
