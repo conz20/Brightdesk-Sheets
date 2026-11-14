@@ -71,7 +71,8 @@ test('release workflow uses supported branch and tag event filters with direct d
   const pushEnd = scheduleStart >= 0 ? scheduleStart : permissionsStart;
   assert.ok(pushStart >= 0 && pushEnd > pushStart, 'push trigger exists');
   const pushTrigger = workflow.slice(pushStart, pushEnd);
-  assert.doesNotMatch(pushTrigger, /branches:|tags:/, 'push must not combine branches and tags filters');
+  assert.match(pushTrigger, /branches: \[main\]/);
+  assert.match(pushTrigger, /tags: \['v\*'\]/, 'version tags are the explicit release trigger');
   assert.match(workflow, /refs\/heads\/main/);
   assert.match(workflow, /startsWith\(github\.ref, 'refs\/tags\/v'\)/);
   assert.match(workflow, /runner: \["self-hosted", "Windows", "X64"\]/);
