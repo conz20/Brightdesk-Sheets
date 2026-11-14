@@ -125,7 +125,7 @@ function updateSheetFormulaBar() {
   const dimensions = $('sheet-status-size');
   if (dimensions) {
     const rows = activeDoc().cells || [];
-    dimensions.textContent = `${rows.length} rows × ${Math.max(12, ...rows.map(row => row.length))} columns`;
+    dimensions.textContent = `${rows.length} rows × ${rows.reduce((maximum, row) => Math.max(maximum, row.length), 12)} columns`;
   }
   const zoom = $('sheet-zoom-value');
   if (zoom) zoom.textContent = `${state.sheetZoom}%`;
@@ -417,7 +417,7 @@ function refreshSheetValues() {
 }
 function renderSheet() {
   const rows = activeDoc().cells || (activeDoc().cells = clone(defaults.sheets.cells));
-  const maxCols = Math.max(12, ...rows.map(r=>r.length));
+  const maxCols = rows.reduce((maximum, row) => Math.max(maximum, row.length), 12);
   const table = document.createElement('table'); table.className='sheet';
   const thead = document.createElement('thead'), head = document.createElement('tr'); const corner=document.createElement('th'); corner.textContent=''; head.append(corner);
   for(let c=0;c<maxCols;c++){const th=document.createElement('th');th.textContent=letter(c);head.append(th);} thead.append(head); table.append(thead);
