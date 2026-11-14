@@ -40,6 +40,19 @@ The product README currently describes:
 
 The current product is an Electron desktop project using Node.js 24.22.2. Its existing test command is explicitly listed in `package.json`; use that exact command rather than assuming a generic test runner. Rust integration work must be preserved where present. Do not replace the current implementation with GridCraft's pure-Rust architecture.
 
+## Current draft implementation: filtering and safe sorting
+
+The active multi-worksheet review branch is extending the P1 editing scope with:
+
+- A Data-tab AutoFilter toggle and per-column dropdown menus on the first/header row.
+- Searchable, multi-select distinct values, with an explicit blank option and AND-combined filters across columns.
+- Filter criteria saved independently with each worksheet in the local Brightdesk project format.
+- Keyboard navigation that skips rows hidden by active filters, including when an edited cell causes its own row to become hidden.
+- Stable sorting of data rows while leaving the header in place, carrying cell styles with their records, and remapping same-worksheet formula references to the destination rows of the records they originally referenced.
+- XLSX AutoFilter range import/export. ExcelJS writes and reads the filter range; Brightdesk's per-value selection criteria remain in the local project format and reset when importing an XLSX workbook. The imported cell data is not removed by this reset.
+
+The implementation includes unit and integration-focused regression tests, but these features must remain marked **draft / unverified** until the exact current commit passes the approved Node.js 24.22.2 CI run, the real XLSX round-trip tests pass, and the running desktop experience is checked. Do not describe the feature as fully Excel-compatible or as full GridCraft parity.
+
 ## Proposed capability sequence
 
 | Priority | Brightdesk capability | Acceptance evidence before calling it complete |
