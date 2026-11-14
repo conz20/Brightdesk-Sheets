@@ -149,25 +149,6 @@
     return indexes;
   }
 
-  function columnIndexFromLabel(label) {
-    let value = 0;
-    for (const character of String(label).toUpperCase()) {
-      value = value * 26 + character.charCodeAt(0) - 64;
-    }
-    return value - 1;
-  }
-
-  function columnLabelFromIndex(index) {
-    let value = index + 1;
-    let label = '';
-    while (value > 0) {
-      const remainder = (value - 1) % 26;
-      label = String.fromCharCode(65 + remainder) + label;
-      value = Math.floor((value - 1) / 26);
-    }
-    return label;
-  }
-
   function translateRangeReference(firstColumn, firstRowNumber, lastColumn, lastRowNumber, destinationBySourceRow, headerRow, prefix) {
     const firstRow = Number(firstRowNumber) - 1;
     const lastRow = Number(lastRowNumber) - 1;
