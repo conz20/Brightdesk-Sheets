@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { cleanFileName, parseCsv, parseTsv, ensureExtension, exportOfficeFile, openOfficeFile, validateProject, assertSheetDimensions } = require('../src/file-service');
-const { createWorkbookTable } = require('../src/sheet-tables');
+const { createWorkbookTable, updateWorkbookTableHeader } = require('../src/sheet-tables');
 
 test('cleanFileName removes unsafe characters and limits length', () => {
   assert.equal(cleanFileName('budget: 2026/report?'), 'budget_ 2026_report_');
@@ -655,6 +655,50 @@ test('XLSX imports apply Brightdesk table colours even when the source only cont
     assert.equal(worksheet.styles.A2.fill, '#EDF7F1');
     assert.equal(worksheet.styles.A3.fill, null);
     assert.equal(worksheet.tables[0].style, 'brightdesk-green');
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+
+test('XLSX round trip keeps table column names in sync after a header cell edit', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-edited-table-header-'));
+  const filePath = path.join(directory, 'edited-header.xlsx');
+  const cells = [['Product', 'Amount'], ['Pen', 10], ['Paper', 20]];
+  const workbook = {
+    title: 'Sales',
+    activeWorksheetId: 'sales',
+    cells,
+    styles: {},
+    tables: [],
+    worksheets: [{
+      id: 'sales',
+      name: 'Sales',
+      cells,
+      styles: {},
+      tables: []
+    }]
+  };
+
+  try {
+    const table = createWorkbookTable(workbook, {
+      top: 0, left: 0, bottom: 2, right: 1
+    }, 'SalesTable');
+    const updated = updateWorkbookTableHeader(workbook, 0, 1, 'Revenue');
+    assert.equal(updated.id, table.id);
+    assert.deepEqual(updated.columns, ['Product', 'Revenue']);
+    assert.deepEqual(workbook.cells[0], ['Product', 'Revenue']);
+
+    await exportOfficeFile({
+      kind: 'sheets',
+      title: workbook.title,
+      activeWorksheetId: workbook.activeWorksheetId,
+      worksheets: workbook.worksheets
+    }, filePath);
+
+    const reopened = await openOfficeFile(filePath);
+    assert.deepEqual(reopened.worksheets[0].cells[0], ['Product', 'Revenue']);
+    assert.deepEqual(reopened.worksheets[0].tables[0].columns, ['Product', 'Revenue']);
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }
