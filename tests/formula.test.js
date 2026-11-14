@@ -31,3 +31,58 @@ test('COUNT and AVERAGE ignore blank cells in ranges', () => {
   assert.equal(calculateCell(cells, 3, 0), 2);
   assert.equal(calculateCell(cells, 4, 0), 15);
 });
+
+
+test('resolves direct references to another worksheet', () => {
+  const worksheets = [
+    { id: 'revenue', name: 'Revenue', cells: [['18']] },
+    { id: 'forecast', name: 'Forecast', cells: [['=Revenue!A1*2']] }
+  ];
+  assert.equal(calculateCell(worksheets[1].cells, 0, 0, new Set(), {
+    worksheets,
+    activeWorksheetId: 'forecast'
+  }), 36);
+});
+
+test('resolves quoted worksheet names including apostrophes', () => {
+  const worksheets = [
+    { id: 'quarter', name: 'Quarter 1', cells: [['12']] },
+    { id: 'owners', name: "O'Brien", cells: [['5']] },
+    { id: 'summary', name: 'Summary', cells: [["='Quarter 1'!A1+'O''Brien'!A1"]] }
+  ];
+  assert.equal(calculateCell(worksheets[2].cells, 0, 0, new Set(), {
+    worksheets,
+    activeWorksheetId: 'summary'
+  }), 17);
+});
+
+test('supports SUM and AVERAGE over ranges on another worksheet', () => {
+  const worksheets = [
+    { id: 'data', name: 'Data', cells: [['1', '2'], ['3', '4']] },
+    { id: 'summary', name: 'Summary', cells: [['=SUM(Data!A1:B2)'], ["=AVERAGE('Data'!A1:B2)"]] }
+  ];
+  const context = { worksheets, activeWorksheetId: 'summary' };
+  assert.equal(calculateCell(worksheets[1].cells, 0, 0, new Set(), context), 10);
+  assert.equal(calculateCell(worksheets[1].cells, 1, 0, new Set(), context), 2.5);
+});
+
+test('detects circular references that cross worksheet boundaries', () => {
+  const worksheets = [
+    { id: 'first', name: 'First', cells: [['=Second!A1+1']] },
+    { id: 'second', name: 'Second', cells: [['=First!A1+1']] }
+  ];
+  assert.equal(calculateCell(worksheets[0].cells, 0, 0, new Set(), {
+    worksheets,
+    activeWorksheetId: 'first'
+  }), '#VALUE!');
+});
+
+test('returns a formula error for references to unknown worksheets', () => {
+  const worksheets = [
+    { id: 'summary', name: 'Summary', cells: [['=Missing!A1']] }
+  ];
+  assert.equal(calculateCell(worksheets[0].cells, 0, 0, new Set(), {
+    worksheets,
+    activeWorksheetId: 'summary'
+  }), '#VALUE!');
+});
