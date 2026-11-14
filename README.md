@@ -55,9 +55,9 @@ These are configured build targets, not confirmation that a package has passed i
 - Add rows and columns, sort a selected column, and import/export CSV and XLSX files. XLSX carries all worksheets; CSV import/export applies to one worksheet at a time.
 - Keep workbook data and worksheet names on the device as part of the Brightdesk project.
 
-**Implementation status:** The current draft development change also adds direct Name Box navigation, a dedicated formula bar and worksheet status/zoom controls. All of these changes remain under review; do not treat them as release-verified until exact-head tests and platform checks pass. Do not treat this work as release-verified until the exact-head tests and platform checks pass.
+**Implementation status:** The draft development change adds worksheet management, A1 Name Box navigation, a dedicated formula bar, keyboard movement (Enter, Tab and arrow keys), worksheet status/zoom controls, and direct cross-worksheet references. It supports SUM, AVERAGE, MIN, MAX, COUNT and COUNTA across worksheet ranges, including quoted worksheet names. These changes are implemented on the review branch only; they are not yet release-verified. Exact-head automated checks, real ExcelJS file round trips and native desktop verification remain outstanding.
 
-**Known boundaries:** Cross-worksheet formulas, VBA/macros, pivot tables, advanced formula coverage, complex workbook features and exact Excel round-trip compatibility are not established.
+**Known boundaries:** This is not full Excel compatibility. VBA/macros, pivot tables, charts and broad advanced-function coverage are not established. Complex workbook fidelity and exact Excel round-trip compatibility remain unverified.
 ## Download
 
 The latest desktop installers are published from this repository’s verified release workflow when a release is approved.
