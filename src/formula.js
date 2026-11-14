@@ -10,7 +10,20 @@
   }
 
   function arithmetic(expression) {
-    const tokens = expression.match(/\d+(?:\.\d+)?|[()+\-*/%]/g) || [];
+    const source = String(expression ?? '');
+    const tokens = [];
+    const tokenPattern = /\s*(\d+(?:\.\d*)?|\.\d+|[()+\-*/%])/gy;
+    let position = 0;
+    while (position < source.length) {
+      tokenPattern.lastIndex = position;
+      const match = tokenPattern.exec(source);
+      if (!match) {
+        if (!source.slice(position).trim()) break;
+        throw new Error('Invalid formula');
+      }
+      tokens.push(match[1]);
+      position = tokenPattern.lastIndex;
+    }
     let at = 0;
     function factor() {
       const token = tokens[at++];
