@@ -215,3 +215,13 @@ test('remaps external worksheet formulas without widening noncontiguous ranges w
     '=A2'
   ]]);
 });
+
+
+test('sorting leaves malformed or oversized formula ranges unchanged without expanding them', () => {
+  const map = new Map([[1, 2], [2, 1]]);
+  const oversizedRow = '=SUM(Sales!A1:A999999999999999999999999)';
+  const oversizedArea = '=SUM(Sales!A1:XFD1000)';
+
+  assert.equal(translateExternalFormulaRow(oversizedRow, map, 'Sales'), oversizedRow);
+  assert.equal(translateExternalFormulaRow(oversizedArea, map, 'Sales'), oversizedArea);
+});
