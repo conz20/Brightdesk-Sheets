@@ -59,7 +59,9 @@ function setStatus(message) {
   if (sheetMessage) sheetMessage.textContent = message;
 }
 function recordSheetHistory() {
-  if (state.app === 'sheets') sheetHistory.capture(workbookHistory, activeDoc());
+  if (state.app !== 'sheets') return;
+  const recorded = sheetHistory.capture(workbookHistory, activeDoc());
+  if (!recorded) setStatus('Undo history is paused for this large workbook to protect memory.');
 }
 function applySheetHistory(direction) {
   if (state.app !== 'sheets') return;
