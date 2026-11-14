@@ -48,11 +48,15 @@ These are configured build targets, not confirmation that a package has passed i
 ## Current first-use workflows
 
 - Edit values in a spreadsheet grid and use the formula bar.
+- Work across named worksheets: add, switch, rename, reorder and delete tabs. The final worksheet cannot be deleted.
+- Existing single-grid workbooks migrate to a first worksheet without changing their saved cell values.
 - Calculate basic arithmetic and supported range functions, including SUM, AVERAGE, MIN, MAX, COUNT and COUNTA.
-- Add rows and columns, sort a selected column, and work with supported CSV and XLSX import/export.
-- Keep the current workbook data on the device as part of the Brightdesk project.
+- Add rows and columns, sort a selected column, and import/export CSV and XLSX files. XLSX carries all worksheets; CSV import/export applies to one worksheet at a time.
+- Keep workbook data and worksheet names on the device as part of the Brightdesk project.
 
-**Known boundaries:** This is a basic spreadsheet foundation. Do not assume VBA/macros, pivot tables, advanced formula coverage, complex workbook features or exact Excel round-trip compatibility.
+**Implementation status:** Multi-worksheet migration, tab operations and multi-worksheet XLSX exchange are under review in the current development change. Do not treat this work as release-verified until the exact-head tests and platform checks pass.
+
+**Known boundaries:** Cross-worksheet formulas, VBA/macros, pivot tables, advanced formula coverage, complex workbook features and exact Excel round-trip compatibility are not established.
 ## Download
 
 The latest desktop installers are published from this repository’s verified release workflow when a release is approved.
