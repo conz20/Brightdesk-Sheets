@@ -267,3 +267,16 @@ test('rejects adding a worksheet once the workbook reaches 256 worksheets', () =
   assert.equal(workbook.worksheets.length, 256);
   assert.equal(workbook.activeWorksheetId, 'sheet-256');
 });
+
+
+test('rejects imported workbooks containing more than 256 worksheets without truncating them', () => {
+  const worksheets = Array.from({ length: 257 }, (_, index) => ({
+    id: `sheet-${index + 1}`,
+    name: `Sheet${index + 1}`,
+    cells: [[`value-${index + 1}`]]
+  }));
+
+  assert.throws(() => normalizeWorkbook({ worksheets }), /cannot contain more than 256 worksheets/i);
+  assert.equal(worksheets.length, 257);
+  assert.equal(worksheets[256].cells[0][0], 'value-257');
+});
