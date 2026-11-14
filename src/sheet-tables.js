@@ -218,6 +218,27 @@
     return { ...result.table, range: { ...result.table.range }, columns: result.table.columns.slice() };
   }
 
+  function updateWorkbookTableHeader(workbook, row, column, requestedValue) {
+    const context = getWorkbookContext(workbook);
+    const table = findTableAtCell(context.tables || [], row, column);
+    if (!table || row !== table.range.top) return null;
+
+    const nextCells = cloneCellGrid(context.cells);
+    const headerValues = nextCells[row].slice(table.range.left, table.range.right + 1);
+    headerValues[column - table.range.left] = String(requestedValue ?? '');
+    const columns = uniqueColumnNames(headerValues);
+    columns.forEach((name, index) => {
+      nextCells[row][table.range.left + index] = name;
+    });
+
+    const nextTables = cloneTableList(context.tables || []).map(existing => (
+      existing.id === table.id ? { ...existing, columns } : existing
+    ));
+    syncWorkbookTableState(context, nextCells, nextTables, context.styles);
+    const updated = nextTables.find(existing => existing.id === table.id);
+    return { ...updated, range: { ...updated.range }, columns: updated.columns.slice() };
+  }
+
   function renameWorkbookTable(workbook, tableId, requestedName) {
     const context = getWorkbookContext(workbook);
     const tables = renameTable(context.tables || [], tableId, requestedName, context.otherTables);
@@ -249,6 +270,7 @@
     findTableAtCell,
     applyTableStyles,
     createWorkbookTable,
+    updateWorkbookTableHeader,
     renameWorkbookTable,
     removeWorkbookTable
   };
