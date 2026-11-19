@@ -18,6 +18,20 @@ if (!apps.has(appId) || !targets[platform]) {
   process.exit(2);
 }
 
+const nativePlatform = { win: 'win32', mac: 'darwin', linux: 'linux' }[platform];
+if (process.platform !== nativePlatform) {
+  console.error(`Build Brightdesk ${appId} on its native ${platform} runner so the matching printer discovery helper can be compiled and packaged.`);
+  process.exit(2);
+}
+
+const nativeBuild = spawnSync(process.execPath, [path.join(__dirname, 'build-printing-native.js')], {
+  cwd: path.resolve(__dirname, '..'),
+  stdio: 'inherit',
+  env: process.env
+});
+if (nativeBuild.error) throw nativeBuild.error;
+if (nativeBuild.status !== 0) process.exit(nativeBuild.status ?? 1);
+
 const npmExec = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const result = spawnSync(npmExec, ['electron-builder', ...targets[platform], '--publish', 'never', '--config', path.resolve(__dirname, '..', 'electron-builder.app.config.js')], {
   cwd: path.resolve(__dirname, '..'),
