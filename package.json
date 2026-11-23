@@ -83,7 +83,7 @@
     "verify:product:linux": "node scripts/verify-standalone-apps.js linux release/apps sheets"
   },
   "dependencies": {
-    "docx": "9.15.1",
+    "docx": "9.16.0",
     "electron-updater": "6.8.11",
     "exceljs": "4.4.0",
     "fast-xml-parser": "5.11.2",
