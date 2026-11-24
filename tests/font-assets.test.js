@@ -12,7 +12,10 @@ test('loads Inter variable faces locally without a network font service',()=>{
  assert.match(css,/font-family:\s*"Inter"/);
  assert.match(css,/font-weight:\s*100\s+900/);
  assert.match(css,/font-style:\s*normal/); assert.match(css,/font-style:\s*italic/);
- assert.match(css,/font-optical-sizing:\s*auto/);
+ assert.match(css, /font-optical-sizing:\s*auto/);
+ assert.match(css, /--brightdesk-font-family:\s*"Inter",\s*system-ui,\s*sans-serif/);
+ assert.match(css, /body\s*\{[^}]*font-family:\s*var\(--brightdesk-font-family\)/s);
+ assert.match(css, /button,\s*input,\s*select,\s*textarea\s*\{[^}]*font-family:\s*inherit/s);
  assert.match(css,/url\("\.\/assets\/fonts\/inter\/Inter\[opsz,wght\]\.ttf"\)/);
  assert.match(css,/url\("\.\/assets\/fonts\/inter\/Inter-Italic\[opsz,wght\]\.ttf"\)/);
  assert.doesNotMatch(css,/https?:\/\//);
