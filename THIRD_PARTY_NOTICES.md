@@ -13840,3 +13840,8 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
+
+
+## Inter 4.1 font software
+
+Brightdesk Sheets includes the Inter 4.1 variable font family (normal and italic faces) from the official Google Fonts repository. Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter). Designed by Rasmus Andersson. Licensed under the SIL Open Font License, Version 1.1. The complete licence text is distributed in `src/assets/fonts/licenses/inter-OFL.txt`.
