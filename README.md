@@ -99,9 +99,11 @@ Use win on Windows or linux on Linux instead of mac.
 
 [Brightdesk Office Suite](https://github.com/connormolloy12/Brightdesk-suite) brings all ten approved Brightdesk products together in one desktop installer.
 
-## Identity and licence
+## Licence and project identity
 
-Brightdesk is independent and is not affiliated with Microsoft. It uses original product names, code, interface design and artwork. See LICENSE, TERMS_AND_CONDITIONS.txt and THIRD_PARTY_NOTICES.md.
+Brightdesk Sheets source code is licensed under the standard MIT License in [LICENSE](LICENSE). MIT permits use, modification and redistribution of covered code, including commercial use and sale, provided the required notices are retained. Official Brightdesk downloads remain free of charge; that distribution policy does not narrow the MIT rights already granted.
+
+MIT does not grant a general right to present a modified build as an official Brightdesk release or to use Brightdesk branding misleadingly. Third-party dependencies, fonts and other bundled resources retain their own terms; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The portfolio-wide [licensing and brand standard](https://github.com/conz20/Brightdesk-suite/blob/main/docs/LICENSING_AND_BRAND_STANDARD.md) and [official release identity policy](https://github.com/conz20/Brightdesk-suite/blob/main/BRAND-AND-RELEASE-IDENTITY.md) explain those boundaries.
 
 ## CI and installer build cadence
 
