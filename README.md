@@ -107,7 +107,7 @@ The Windows, macOS and Linux installer matrix remains available through a manual
 
 ## Spreadsheet reference study
 
-The [GridCraft reference study and Brightdesk Sheets roadmap](docs/GRIDCRAFT_REFERENCE_AND_SHEETS_ROADMAP.md) records feature research, the current verified first-use scope, proposed priorities, acceptance evidence and licensing boundaries. It is a development roadmap, not a claim of GridCraft or Excel parity.
+The [GridCraft reference study and Brightdesk Sheets roadmap](docs/GRIDCRAFT_REFERENCE_AND_SHEETS_ROADMAP.md) records feature research, the current verified first-use scope, proposed priorities, acceptance evidence and implementation boundaries. It is a development roadmap, not a claim of GridCraft or Excel parity.
 
 ## Documentation freshness
 
