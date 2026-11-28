@@ -107,7 +107,7 @@ Brightdesk is independent and is not affiliated with Microsoft. It uses original
 
 Pull requests and pushes to `main` run the product validation job. Markdown-only changes are excluded from this test workflow because they do not change executable product code; the README freshness check remains responsible for documentation changes.
 
-A scheduled maintenance validation runs every **Monday at 04:17 UTC**. The scheduled run performs product validation on Brightdesk's private macOS ARM64 runner, including release preflight and dependency audit; it does not create desktop installers.
+The scheduled maintenance validation runs product checks on a GitHub-hosted Ubuntu runner, including release preflight and dependency audit; it does not create desktop installers.
 
 The Windows, macOS and Linux installer matrix remains available through a manual workflow dispatch with `build_installers: true`. Publishing remains a separate opt-in action with `publish_release: true`. This keeps routine checks lighter without removing any operating-system build target or reducing cross-platform release coverage.
 
@@ -130,9 +130,9 @@ The renderer uses the Brightdesk Common-Libs JSON storage helper from a checked-
 
 The migration keeps the existing `brightdesk-docs-v3`, legacy `brightdesk-docs-v2` and `brightdesk-app-setup-v1` storage keys. Existing local data is not moved or deleted. The consumer contract tests verify the vendor pin, provenance, script order, compatibility with legacy documents and preservation of malformed stored data for recovery.
 
-## Private CI runner
+## GitHub-hosted CI
 
-Pull-request product tests and README checks run on Brightdesk's private macOS ARM64 runner. Routine pull-request verification does not use GitHub-hosted paid runners. Installer matrix builds and release publishing are separate manual workflow actions and are not run by pull-request checks.
+Pull-request product tests and README checks run on GitHub-hosted Ubuntu. The manual Windows, macOS and Linux installer matrix uses matching GitHub-hosted platform runners, and release publishing uses GitHub-hosted Ubuntu. None of these workflows requires the owner's MacBook, another personal computer or a self-hosted runner. Paid runner overages are not permitted; report capacity blockers instead of using a local or paid runner.
 
 ## Application identity
 
