@@ -1,6 +1,6 @@
 # Brightdesk project memory
 
-The standing project requirement is to use exactly Node.js 24.22.2 LTS for development, testing and desktop installer builds.
+The standing project requirement is latest-stable-first: check official upstream release sources, current security advisories and support status before each runtime, toolchain or dependency update, then select the newest stable version that passes Brightdesk compatibility checks. The current tested local Node.js pin remains 24.22.2 LTS until its candidate update passes; Node.js 24.22.3 is the security-patch candidate and Node.js 26.13.1 requires a separate major-runtime compatibility trial. Keep exact tested pins and evidence in the shared Brightdesk Suite Version Compatibility Standard.
 
 The approved and fixed product scope is exactly ten Brightdesk products:
 - Brightdesk Pages
@@ -14,9 +14,9 @@ The approved and fixed product scope is exactly ten Brightdesk products:
 - Brightdesk To Do
 - Brightdesk Workspace
 
-All ten products are integrated into Brightdesk-suite and have product-specific desktop installer build targets. Brightdesk-Pages is the only separate product repository currently confirmed to exist. The other nine products are prepared as repository folders by the suite generator; they do not become GitHub repositories until each is created on GitHub and its source is pushed.
+All ten approved customer products have their own GitHub repositories and are integrated into Brightdesk Office Suite. The live owner portfolio contains 28 active, unarchived repositories as of 28 November 2026; repository count is not the customer-product count. Brightdesk-AI is private engineering tooling, Brightdesk-Archives is owner-controlled support infrastructure, and the remaining supporting repositories are not additional customer products.
 
-Every prepared product folder is generated from the same suite source, with product-specific metadata, original artwork, locked package files and its own build workflow. Each desktop build is configured for its named product, while Brightdesk-suite continues to contain all ten products together.
+Each product repository is independently maintained and connected to the Suite. Keep source, tests, dependencies, documentation and installer evidence current in the repository being changed. Integration or repository presence does not prove that tests, accessibility, persistence, installers or release acceptance are complete.
 
 ## Brightdesk naming rule
 
