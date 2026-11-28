@@ -31,7 +31,7 @@ test('each app resolves to its own release asset on Windows, macOS and Linux', (
     for (const [platform, filename] of cases) {
       const result = createStandaloneDownload({ appId, platform, version: '0.1.0' });
       assert.equal(result.filename, filename, `${appId} on ${platform}`);
-      assert.equal(result.url, `https://github.com/connormolloy12/Brightdesk-suite/releases/latest/download/${encodeURIComponent(filename)}`);
+      assert.equal(result.url, `https://github.com/conz20/Brightdesk-suite/releases/latest/download/${encodeURIComponent(filename)}`);
     }
   }
 });

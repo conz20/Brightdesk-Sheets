@@ -1,11 +1,11 @@
 # Brightdesk Sheets
 
-<p align="center"><img src="assets/brand/brightdesk-logo.svg" alt="Brightdesk Office Suite" width="420"></p>
+<p align="center"><img src="assets/brand/brightdesk-logo.svg" alt="Brightdesk logo" width="420"></p>
 <p align="center"><img src="assets/icons/sheets.svg" alt="Brightdesk Sheets application icon" width="112" height="112"></p>
 
 <p align="center"><strong>Work with tables, calculations, formulas and data.</strong></p>
 
-<p align="center"><a href="https://raw.githubusercontent.com/connormolloy12/Brightdesk-Sheets/main/assets/previews/sheets-workspace.svg"><img src="assets/previews/sheets-workspace.svg" alt="Brightdesk Sheets interface design" width="100%"></a></p>
+<p align="center"><a href="https://raw.githubusercontent.com/conz20/Brightdesk-Sheets/main/assets/previews/sheets-workspace.svg"><img src="assets/previews/sheets-workspace.svg" alt="Brightdesk Sheets interface design" width="100%"></a></p>
 
 <p align="center"><sub>Select the interface image to open the full-size design.</sub></p>
 
@@ -15,7 +15,7 @@ Brightdesk Sheets is a dedicated desktop application within the independent Brig
 
 ## Shared Brightdesk design standard
 
-This product follows the [Brightdesk visual and interaction standard](https://github.com/connormolloy12/Brightdesk-suite/blob/main/docs/BRIGHTDESK_VISUAL_STANDARD.md) for branding, icon usage, layout, responsive behaviour and accessibility.
+This product follows the [Brightdesk visual and interaction standard](https://github.com/conz20/Brightdesk-suite/blob/main/docs/BRIGHTDESK_VISUAL_STANDARD.md) for branding, icon usage, layout, responsive behaviour and accessibility.
 
 
 
@@ -31,7 +31,7 @@ The stylesheet is packaged with the desktop product and does not load from GitHu
 
 ## Cross-platform consistency
 
-The Windows, macOS and Linux editions use the same approved Brightdesk interface and supported product scope. Shared layout, typography, spacing, component states and navigation follow the [Brightdesk visual and interaction standard](https://github.com/connormolloy12/Brightdesk-suite/blob/main/docs/BRIGHTDESK_VISUAL_STANDARD.md). This product's original icon and approved accent remain the same on every operating system. Only operating-system integrations such as window controls, native file dialogs, keyboard conventions and package formats may adapt to platform conventions.
+The Windows, macOS and Linux editions use the same approved Brightdesk interface and supported product scope. Shared layout, typography, spacing, component states and navigation follow the [Brightdesk visual and interaction standard](https://github.com/conz20/Brightdesk-suite/blob/main/docs/BRIGHTDESK_VISUAL_STANDARD.md). This product's original icon and approved accent remain the same on every operating system. Only operating-system integrations such as window controls, native file dialogs, keyboard conventions and package formats may adapt to platform conventions.
 
 | Operating system | Configured package targets |
 | --- | --- |
@@ -63,7 +63,7 @@ The latest desktop installers are published from this repository’s verified re
 | macOS | Universal installer (.dmg), package (.pkg) and archive (.zip) |
 | Linux | x64 AppImage and Debian package (.deb) |
 
-The complete ten-product desktop suite remains available from [Brightdesk-suite](https://github.com/connormolloy12/Brightdesk-suite).
+The complete ten-product desktop suite remains available from [Brightdesk-suite](https://github.com/conz20/Brightdesk-suite).
 
 ## Quality and security
 
@@ -97,11 +97,13 @@ Use win on Windows or linux on Linux instead of mac.
 
 ## Related project
 
-[Brightdesk Office Suite](https://github.com/connormolloy12/Brightdesk-suite) brings all ten approved Brightdesk products together in one desktop installer.
+[Brightdesk Office Suite](https://github.com/conz20/Brightdesk-suite) brings all ten approved Brightdesk products together in one desktop installer.
 
-## Identity and licence
+## Licence and project identity
 
-Brightdesk is independent and is not affiliated with Microsoft. It uses original product names, code, interface design and artwork. See LICENSE, TERMS_AND_CONDITIONS.txt and THIRD_PARTY_NOTICES.md.
+Brightdesk Sheets source code is licensed under the standard MIT License in [LICENSE](LICENSE). MIT permits use, modification and redistribution of covered code, including commercial use and sale, provided the required notices are retained. Official Brightdesk downloads remain free of charge; that distribution policy does not narrow the MIT rights already granted.
+
+MIT does not grant a general right to present a modified build as an official Brightdesk release or to use Brightdesk branding misleadingly. Third-party dependencies, fonts and other bundled resources retain their own terms; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The portfolio-wide [licensing and brand standard](https://github.com/conz20/Brightdesk-suite/blob/main/docs/LICENSING_AND_BRAND_STANDARD.md) and [official release identity policy](https://github.com/conz20/Brightdesk-suite/blob/main/BRAND-AND-RELEASE-IDENTITY.md) explain those boundaries.
 
 ## CI and installer build cadence
 
