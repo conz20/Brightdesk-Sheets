@@ -25,7 +25,9 @@ test('Node.js 24.22.2 remains the single exact Brightdesk runtime', () => {
     : productWorkflow;
   assert.match(read(buildWorkflow), /node-version: 24\.22\.2/);
   assert.match(read(auditWorkflow), /node-version: 24\.22\.2/);
-  assert.match(read('AGENTS.md'), /exactly Node\.js \*\*24\.22\.2 LTS\*\*/);
+  assert.match(read('AGENTS.md'), /newest stable version/i);
+  assert.match(read('AGENTS.md'), /Version Compatibility Standard/i);
+  assert.doesNotMatch(read('AGENTS.md'), /Do not change the approved versions without explicit owner approval/);
   assert.match(read('PROJECT_MEMORY.md'), /standing project requirement/);
 });
 
