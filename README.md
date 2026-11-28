@@ -65,12 +65,6 @@ The latest desktop installers are published from this repository’s verified re
 
 The complete ten-product desktop suite remains available from [Brightdesk-suite](https://github.com/connormolloy12/Brightdesk-suite).
 
-## Quality and security
-
-Pull requests and pushes run the product and shared-engine test suite, verify the dependency lock and third-party licences, check release preflight and block high-severity dependency vulnerabilities. The same checks repeat daily. Dependabot checks npm packages and GitHub Actions weekly.
-
-Installer builds are started manually. Publishing a GitHub Release is a separate manual choice and is disabled by default.
-
 ## Run from source
 
 Use Node.js **24.22.2**.
@@ -99,9 +93,9 @@ Use win on Windows or linux on Linux instead of mac.
 
 [Brightdesk Office Suite](https://github.com/connormolloy12/Brightdesk-suite) brings all ten approved Brightdesk products together in one desktop installer.
 
-## Identity and licence
+## Project identity
 
-Brightdesk is independent and is not affiliated with Microsoft. It uses original product names, code, interface design and artwork. See LICENSE, TERMS_AND_CONDITIONS.txt and THIRD_PARTY_NOTICES.md.
+Brightdesk is independent and is not affiliated with Microsoft. It uses original product names, code, interface design and artwork.
 
 ## CI and installer build cadence
 
