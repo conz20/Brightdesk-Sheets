@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { cleanFileName, parseCsv, parseTsv, ensureExtension, exportOfficeFile, openOfficeFile, validateProject, assertSheetDimensions } = require('../src/file-service');
+const { createWorkbookTable, updateWorkbookTableHeader } = require('../src/sheet-tables');
 
 test('cleanFileName removes unsafe characters and limits length', () => {
   assert.equal(cleanFileName('budget: 2026/report?'), 'budget_ 2026_report_');
@@ -165,3 +166,749 @@ test('CSV and TSV parsers reject malformed quotes and preserve empty quoted cell
     assert.deepEqual(parse('""'), [['']]);
   }
 });
+
+
+test('Brightdesk project validation accepts a valid multi-worksheet workbook', () => {
+  const project = {
+    title: 'Quarterly plan',
+    docs: {
+      sheets: {
+        title: 'Quarterly plan',
+        activeWorksheetId: 'sheet-2',
+        cells: [['Costs', '25']],
+        worksheets: [
+          { id: 'sheet-1', name: 'Sales', cells: [['Revenue', '100']] },
+          { id: 'sheet-2', name: 'Costs', cells: [['Costs', '25']] }
+        ]
+      }
+    }
+  };
+  assert.equal(validateProject(project), project);
+});
+
+test('Brightdesk project validation rejects invalid worksheet names, duplicate tabs and unknown active sheets', () => {
+  const projectWith = worksheets => ({ docs: { sheets: { worksheets, activeWorksheetId: worksheets[0]?.id } } });
+  assert.throws(() => validateProject(projectWith([
+    { id: 'one', name: 'Overview', cells: [['1']] },
+    { id: 'two', name: 'overview', cells: [['2']] }
+  ])), /duplicate worksheet name/i);
+  assert.throws(() => validateProject(projectWith([
+    { id: 'one', name: 'bad/name', cells: [['1']] }
+  ])), /invalid worksheet name/i);
+  assert.throws(() => validateProject({ docs: { sheets: {
+    worksheets: [{ id: 'one', name: 'Overview', cells: [['1']] }],
+    activeWorksheetId: 'missing'
+  } } }), /active worksheet/i);
+});
+
+test('Brightdesk project files preserve every worksheet and the active selection', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-multi-sheet-project-'));
+  const filePath = path.join(directory, 'quarterly-plan.bdesk');
+  const project = {
+    title: 'Quarterly plan',
+    docs: {
+      sheets: {
+        title: 'Quarterly plan',
+        activeWorksheetId: 'sheet-2',
+        cells: [['Costs', '25']],
+        worksheets: [
+          { id: 'sheet-1', name: 'Sales', cells: [['Revenue', '100']], styles: { A1: { bold: true, color: '#1E6847' } } },
+          { id: 'sheet-2', name: 'Costs', cells: [['Costs', '25']], styles: { B1: { numberFormat: 'currency' } } }
+        ]
+      }
+    }
+  };
+  try {
+    await exportOfficeFile({ project }, filePath);
+    assert.deepEqual(await openOfficeFile(filePath), project);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('XLSX import and export preserve all worksheet names and values', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-multi-sheet-xlsx-'));
+  const filePath = path.join(directory, 'quarterly-plan.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Quarterly plan',
+    rows: [['Revenue', '100']],
+    activeWorksheetId: 'sheet-2',
+    worksheets: [
+      { id: 'sheet-1', name: 'Sales', cells: [['Revenue', 100], ['North', 60]] },
+      { id: 'sheet-2', name: 'Costs', cells: [['Costs', 25], ['Rent', 10]] }
+    ]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.equal(imported.worksheets.length, 2);
+    assert.deepEqual(imported.worksheets.map(sheet => sheet.name), ['Sales', 'Costs']);
+    assert.deepEqual(imported.worksheets[0].cells, payload.worksheets[0].cells);
+    assert.deepEqual(imported.worksheets[1].cells, payload.worksheets[1].cells);
+    assert.equal(imported.activeWorksheetId, 'sheet-2');
+    assert.deepEqual(imported.cells, payload.worksheets[1].cells);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('Brightdesk project validation accepts safe cell formatting and rejects invalid styles', () => {
+  const valid = {
+    docs: { sheets: {
+      activeWorksheetId: 'one',
+      worksheets: [{ id: 'one', name: 'Overview', cells: [['100']], styles: {
+        A1: { bold: true, italic: false, underline: true, fill: '#EDF7F1', color: '#1E6847', numberFormat: 'currency' }
+      } }]
+    } }
+  };
+  assert.equal(validateProject(valid), valid);
+
+  const invalidStyle = value => ({ docs: { sheets: {
+    activeWorksheetId: 'one',
+    worksheets: [{ id: 'one', name: 'Overview', cells: [['100']], styles: { A1: value } }]
+  } } });
+  assert.throws(() => validateProject(invalidStyle({ fill: 'red' })), /invalid cell formatting/i);
+  assert.throws(() => validateProject(invalidStyle({ color: '#12345' })), /invalid cell formatting/i);
+  assert.throws(() => validateProject(invalidStyle({ numberFormat: 'custom' })), /invalid cell formatting/i);
+  assert.throws(() => validateProject(invalidStyle({ bold: 'yes' })), /invalid cell formatting/i);
+  assert.throws(() => validateProject({
+    docs: { sheets: { activeWorksheetId: 'one', worksheets: [
+      { id: 'one', name: 'Overview', cells: [['100']], styles: { A0: { bold: true } } }
+    ] } }
+  }), /invalid cell address/i);
+});
+
+test('XLSX round trip preserves cell number formats, font, fill and worksheet-specific formatting', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-formatted-xlsx-'));
+  const filePath = path.join(directory, 'formatted-workbook.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Formatted workbook',
+    activeWorksheetId: 'costs',
+    worksheets: [
+      { id: 'sales', name: 'Sales', cells: [['Revenue', '1234.5']], styles: {
+        B1: { bold: true, color: '#1E6847', numberFormat: 'currency' }
+      } },
+      { id: 'costs', name: 'Costs', cells: [['Ratio', '0.25']], styles: {
+        B1: { italic: true, underline: true, fill: '#EDF7F1', numberFormat: 'percent' }
+      } }
+    ]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.deepEqual(imported.worksheets[0].styles.B1, {
+      bold: true, italic: false, underline: false, fill: null, color: '#1E6847', numberFormat: 'currency'
+    });
+    assert.deepEqual(imported.worksheets[1].styles.B1, {
+      bold: false, italic: true, underline: true, fill: '#EDF7F1', color: null, numberFormat: 'percent'
+    });
+    assert.equal(imported.activeWorksheetId, 'sheet-2');
+    assert.deepEqual(imported.styles, imported.worksheets[1].styles);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('XLSX export applies legacy active-sheet styles to the actual active worksheet', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-active-sheet-style-'));
+  const filePath = path.join(directory, 'active-sheet-style.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Active style',
+    activeWorksheetId: 'second',
+    styles: { A1: { bold: true, numberFormat: 'currency' } },
+    worksheets: [
+      { id: 'first', name: 'First', cells: [['One']] },
+      { id: 'second', name: 'Second', cells: [['Two']] }
+    ]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.equal(imported.worksheets[0].styles.A1, undefined);
+    assert.equal(imported.worksheets[1].styles.A1.bold, true);
+    assert.equal(imported.worksheets[1].styles.A1.numberFormat, 'currency');
+    assert.equal(imported.activeWorksheetId, 'sheet-2');
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('XLSX round trip preserves ISO date cells as dates with the selected display format', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-date-format-'));
+  const filePath = path.join(directory, 'date-format.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Date values',
+    worksheets: [{
+      id: 'dates',
+      name: 'Dates',
+      cells: [['2026-11-14']],
+      styles: { A1: { numberFormat: 'date' } }
+    }]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.equal(imported.cells[0][0], '2026-11-14');
+    assert.equal(imported.styles.A1.numberFormat, 'date');
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+
+test('Brightdesk project validation accepts saved worksheet filters and rejects unsafe filter criteria', () => {
+  const valid = {
+    docs: { sheets: {
+      activeWorksheetId: 'one',
+      worksheets: [{
+        id: 'one', name: 'Overview', cells: [['Region'], ['East'], ['West']],
+        autoFilter: { enabled: true, filters: { '0': ['East', ''] } }
+      }]
+    } }
+  };
+  assert.equal(validateProject(valid), valid);
+
+  const invalidWith = autoFilter => ({ docs: { sheets: {
+    activeWorksheetId: 'one',
+    worksheets: [{ id: 'one', name: 'Overview', cells: [['Region'], ['East']], autoFilter }]
+  } } });
+  assert.throws(() => validateProject(invalidWith({ enabled: 'yes', filters: {} })), /invalid worksheet filter/i);
+  assert.throws(() => validateProject(invalidWith({ enabled: true, filters: { '-1': ['East'] } })), /invalid worksheet filter/i);
+  assert.throws(() => validateProject(invalidWith({ enabled: true, filters: { '16384': ['East'] } })), /invalid worksheet filter/i);
+  assert.throws(() => validateProject(invalidWith({ enabled: true, filters: { '0': ['East', 3] } })), /invalid worksheet filter/i);
+  assert.throws(() => validateProject(invalidWith({ enabled: true, filters: [] })), /invalid worksheet filter/i);
+});
+
+test('Brightdesk project files preserve saved filter criteria for every worksheet', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-filtered-project-'));
+  const filePath = path.join(directory, 'filtered-workbook.bdesk');
+  const project = {
+    title: 'Filtered workbook',
+    docs: { sheets: {
+      activeWorksheetId: 'costs',
+      cells: [['Region'], ['East']],
+      autoFilter: { enabled: true, filters: { '0': ['East'] } },
+      worksheets: [
+        { id: 'sales', name: 'Sales', cells: [['Region'], ['West']], autoFilter: { enabled: true, filters: { '0': ['West'] } } },
+        { id: 'costs', name: 'Costs', cells: [['Region'], ['East']], autoFilter: { enabled: true, filters: { '0': ['East'] } } }
+      ]
+    } }
+  };
+  try {
+    await exportOfficeFile({ project }, filePath);
+    assert.deepEqual(await openOfficeFile(filePath), project);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('XLSX round trip preserves AutoFilter ranges and clearly resets local-only filter selections', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-filtered-xlsx-'));
+  const filePath = path.join(directory, 'filtered-workbook.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Filtered workbook',
+    activeWorksheetId: 'sales',
+    worksheets: [
+      {
+        id: 'sales', name: 'Sales',
+        cells: [['Region', 'Amount'], ['East', 100], ['West', 200]],
+        autoFilter: { enabled: true, filters: { '0': ['East'] } }
+      },
+      {
+        id: 'costs', name: 'Costs',
+        cells: [['Type', 'Amount'], ['Rent', 500], ['Wages', 700]],
+        autoFilter: { enabled: false, filters: {} }
+      }
+    ]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.equal(imported.worksheets[0].autoFilter.enabled, true);
+    assert.deepEqual(imported.worksheets[0].autoFilter.filters, {});
+    assert.deepEqual(imported.worksheets[0].cells, payload.worksheets[0].cells);
+    assert.equal(imported.worksheets[1].autoFilter.enabled, false);
+    assert.deepEqual(imported.worksheets[1].cells, payload.worksheets[1].cells);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('Brightdesk project validation accepts named worksheet tables and rejects unsafe or overlapping definitions', () => {
+  const table = {
+    id: 'table-1',
+    name: 'SalesTable',
+    range: { top: 0, left: 0, bottom: 2, right: 1 },
+    columns: ['Product', 'Amount'],
+    headerRow: true,
+    totalsRow: false,
+    style: 'brightdesk-green'
+  };
+  const valid = { docs: { sheets: {
+    activeWorksheetId: 'one',
+    worksheets: [{ id: 'one', name: 'Sales', cells: [
+      ['Product', 'Amount'], ['Pen', '10'], ['Paper', '20']
+    ], tables: [table] }]
+  } } };
+  assert.equal(validateProject(valid), valid);
+
+  const invalidTable = change => ({ docs: { sheets: {
+    activeWorksheetId: 'one',
+    worksheets: [{ id: 'one', name: 'Sales', cells: [
+      ['Product', 'Amount'], ['Pen', '10'], ['Paper', '20']
+    ], tables: [{ ...table, ...change }] }]
+  } } });
+  assert.throws(() => validateProject(invalidTable({ name: 'Bad Name' })), /invalid table name/i);
+  assert.throws(() => validateProject(invalidTable({ range: { top: 0, left: 0, bottom: 3, right: 1 } })), /inside the worksheet/i);
+  assert.throws(() => validateProject(invalidTable({ columns: ['Only one'] })), /invalid table columns/i);
+  assert.throws(() => validateProject(invalidTable({ style: 'external-style' })), /invalid table/i);
+  assert.throws(() => validateProject({ docs: { sheets: {
+    activeWorksheetId: 'one',
+    worksheets: [{ id: 'one', name: 'Sales', cells: [
+      ['A', 'B'], ['1', '2'], ['3', '4']
+    ], tables: [
+      table,
+      { ...table, id: 'table-2', name: 'SecondTable', range: { top: 1, left: 1, bottom: 2, right: 1 }, columns: ['Amount'] }
+    ] }]
+  } } }), /overlap/i);
+});
+
+test('XLSX round trip retains named Excel tables with data rows and Brightdesk table style', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-table-xlsx-'));
+  const filePath = path.join(directory, 'sales-table.xlsx');
+  const table = {
+    id: 'table-1',
+    name: 'SalesTable',
+    range: { top: 0, left: 0, bottom: 2, right: 1 },
+    columns: ['Product', 'Amount'],
+    headerRow: true,
+    totalsRow: false,
+    style: 'brightdesk-green'
+  };
+  const payload = {
+    kind: 'sheets',
+    title: 'Sales',
+    activeWorksheetId: 'sales',
+    worksheets: [{
+      id: 'sales',
+      name: 'Sales',
+      cells: [['Product', 'Amount'], ['Pen', 10], ['Paper', 20]],
+      tables: [table]
+    }]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.equal(imported.worksheets[0].tables.length, 1);
+    assert.equal(imported.worksheets[0].tables[0].name, 'SalesTable');
+    assert.deepEqual(imported.worksheets[0].tables[0].columns, ['Product', 'Amount']);
+    assert.deepEqual(imported.worksheets[0].tables[0].range, table.range);
+    assert.deepEqual(imported.worksheets[0].cells, payload.worksheets[0].cells);
+    assert.equal(imported.tables[0].name, 'SalesTable');
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+
+test('created worksheet tables retain Brightdesk cell styling through XLSX and project-file round trips', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-table-format-roundtrip-'));
+  const xlsxPath = path.join(directory, 'sales.xlsx');
+  const projectPath = path.join(directory, 'sales.bdesk');
+  const cells = [['Product', 'Amount'], ['Pen', 10], ['Paper', 20]];
+  const workbook = {
+    title: 'Sales',
+    activeWorksheetId: 'sales',
+    cells,
+    styles: { B2: { numberFormat: 'currency' } },
+    tables: [],
+    worksheets: [{
+      id: 'sales',
+      name: 'Sales',
+      cells,
+      styles: { B2: { numberFormat: 'currency' } },
+      tables: []
+    }]
+  };
+
+  try {
+    const created = createWorkbookTable(workbook, {
+      top: 0, left: 0, bottom: 2, right: 1
+    }, 'SalesTable');
+    assert.equal(created.name, 'SalesTable');
+
+    const project = {
+      title: 'Sales',
+      docs: {
+        sheets: {
+          title: 'Sales',
+          activeWorksheetId: workbook.activeWorksheetId,
+          cells: workbook.cells,
+          styles: workbook.styles,
+          tables: workbook.tables,
+          worksheets: workbook.worksheets
+        }
+      }
+    };
+
+    await exportOfficeFile({ project }, projectPath);
+    const reopenedProject = await openOfficeFile(projectPath);
+    assert.deepEqual(reopenedProject, project);
+    assert.equal(reopenedProject.docs.sheets.worksheets[0].tables[0].name, 'SalesTable');
+    assert.equal(reopenedProject.docs.sheets.worksheets[0].styles.A1.fill, '#27845C');
+    assert.equal(reopenedProject.docs.sheets.worksheets[0].styles.A2.fill, '#EDF7F1');
+
+    await exportOfficeFile({
+      kind: 'sheets',
+      title: workbook.title,
+      activeWorksheetId: workbook.activeWorksheetId,
+      cells: workbook.cells,
+      styles: workbook.styles,
+      tables: workbook.tables,
+      worksheets: workbook.worksheets
+    }, xlsxPath);
+
+    const reopenedXlsx = await openOfficeFile(xlsxPath);
+    assert.equal(reopenedXlsx.activeWorksheetId, 'sheet-1');
+    assert.equal(reopenedXlsx.worksheets[0].tables[0].name, 'SalesTable');
+    assert.deepEqual(reopenedXlsx.worksheets[0].cells, cells);
+    assert.equal(reopenedXlsx.worksheets[0].styles.A1.fill, '#27845C');
+    assert.equal(reopenedXlsx.worksheets[0].styles.A1.color, '#FFFFFF');
+    assert.equal(reopenedXlsx.worksheets[0].styles.A1.bold, true);
+    assert.equal(reopenedXlsx.worksheets[0].styles.A2.fill, '#EDF7F1');
+    assert.equal(reopenedXlsx.worksheets[0].styles.B2.numberFormat, 'currency');
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('XLSX import preserves separate named tables across worksheets', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-multiple-tables-'));
+  const filePath = path.join(directory, 'two-tables.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Two tables',
+    activeWorksheetId: 'costs',
+    worksheets: [
+      { id: 'sales', name: 'Sales', cells: [['Product', 'Amount'], ['Pen', '10']], tables: [
+        { id: 'table-1', name: 'SalesTable', range: { top: 0, left: 0, bottom: 1, right: 1 }, columns: ['Product', 'Amount'], headerRow: true, totalsRow: false, style: 'brightdesk-green' }
+      ] },
+      { id: 'costs', name: 'Costs', cells: [['Item', 'Cost'], ['Rent', '500']], tables: [
+        { id: 'table-2', name: 'CostsTable', range: { top: 0, left: 0, bottom: 1, right: 1 }, columns: ['Item', 'Cost'], headerRow: true, totalsRow: false, style: 'brightdesk-green' }
+      ] }
+    ]
+  };
+  try {
+    await exportOfficeFile(payload, filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.deepEqual(imported.worksheets.map(sheet => sheet.tables.map(table => table.name)), [['SalesTable'], ['CostsTable']]);
+    assert.equal(imported.activeWorksheetId, 'sheet-2');
+    assert.equal(imported.tables[0].name, 'CostsTable');
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+
+test('Brightdesk project files preserve named tables independently across worksheets', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-tables-project-'));
+  const filePath = path.join(directory, 'tables.bdesk');
+  const salesTable = {
+    id: 'table-1', name: 'SalesTable',
+    range: { top: 0, left: 0, bottom: 1, right: 1 },
+    columns: ['Product', 'Amount'], headerRow: true, totalsRow: false, style: 'brightdesk-green'
+  };
+  const costsTable = {
+    id: 'table-2', name: 'CostsTable',
+    range: { top: 0, left: 0, bottom: 1, right: 1 },
+    columns: ['Item', 'Cost'], headerRow: true, totalsRow: false, style: 'brightdesk-green'
+  };
+  const project = { docs: { sheets: {
+    activeWorksheetId: 'costs',
+    cells: [['Item', 'Cost'], ['Rent', 500]],
+    tables: [costsTable],
+    worksheets: [
+      { id: 'sales', name: 'Sales', cells: [['Product', 'Amount'], ['Pen', 10]], tables: [salesTable] },
+      { id: 'costs', name: 'Costs', cells: [['Item', 'Cost'], ['Rent', 500]], tables: [costsTable] }
+    ]
+  } } };
+  try {
+    await exportOfficeFile({ project }, filePath);
+    assert.deepEqual(await openOfficeFile(filePath), project);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+
+test('XLSX imports apply Brightdesk table colours even when the source only contains an Excel table style', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-external-table-style-'));
+  const filePath = path.join(directory, 'external-table.xlsx');
+  const ExcelJS = require('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Inventory');
+  sheet.addTable({
+    name: 'InventoryTable',
+    ref: 'A1:B3',
+    headerRow: true,
+    totalsRow: false,
+    style: { theme: 'TableStyleMedium2', showRowStripes: true },
+    columns: [{ name: 'Item' }, { name: 'Quantity' }],
+    rows: [['Paper', 12], ['Pens', 8]]
+  });
+
+  try {
+    await workbook.xlsx.writeFile(filePath);
+    const imported = await openOfficeFile(filePath);
+    const worksheet = imported.worksheets[0];
+
+    assert.equal(worksheet.tables[0].name, 'InventoryTable');
+    assert.deepEqual(worksheet.cells, [['Item', 'Quantity'], ['Paper', 12], ['Pens', 8]]);
+    assert.equal(worksheet.styles.A1.fill, '#27845C');
+    assert.equal(worksheet.styles.A1.color, '#FFFFFF');
+    assert.equal(worksheet.styles.A1.bold, true);
+    assert.equal(worksheet.styles.A2.fill, '#EDF7F1');
+    assert.equal(worksheet.styles.A3.fill, null);
+    assert.equal(worksheet.tables[0].style, 'brightdesk-green');
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+
+
+
+test('XLSX import converts rich text, hyperlinks and error cells to supported visible text', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-cell-values-'));
+  const filePath = path.join(directory, 'cell-values.xlsx');
+  const ExcelJS = require('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Imported values');
+  sheet.getCell('A1').value = {
+    richText: [{ text: 'Rich ' }, { text: 'text' }]
+  };
+  sheet.getCell('B1').value = {
+    text: 'Brightdesk website',
+    hyperlink: 'https://example.com'
+  };
+  sheet.getCell('C1').value = { error: '#DIV/0!' };
+
+  try {
+    await workbook.xlsx.writeFile(filePath);
+    const imported = await openOfficeFile(filePath);
+    assert.deepEqual(imported.cells, [['Rich text', 'Brightdesk website', '#DIV/0!']]);
+    assert.doesNotThrow(() => validateProject({
+      docs: { sheets: { cells: imported.cells } }
+    }));
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('XLSX export preserves zero-padded identifiers and high-precision numbers as text', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-identifiers-'));
+  const filePath = path.join(directory, 'identifiers.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Identifiers',
+    activeWorksheetId: 'identifiers',
+    worksheets: [{
+      id: 'identifiers',
+      name: 'Identifiers',
+      cells: [
+        ['Code', 'Reference', '', 'Plain code', 'Plain reference'],
+        ['00123', '12345678901234567', '', '00456', '12345678901234568']
+      ],
+      tables: [{
+        id: 'table-1',
+        name: 'IdentifierTable',
+        range: { top: 0, left: 0, bottom: 1, right: 1 },
+        columns: ['Code', 'Reference'],
+        headerRow: true,
+        totalsRow: false,
+        style: 'brightdesk-green'
+      }]
+    }]
+  };
+
+  try {
+    await exportOfficeFile(payload, filePath);
+    const reopened = await openOfficeFile(filePath);
+    const cells = reopened.worksheets[0].cells;
+    assert.equal(cells[1][0], '00123');
+    assert.equal(cells[1][1], '12345678901234567');
+    assert.equal(cells[1][3], '00456');
+    assert.equal(cells[1][4], '12345678901234568');
+    assert.equal(reopened.worksheets[0].tables[0].name, 'IdentifierTable');
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+
+test('XLSX export preserves hexadecimal and binary-looking text values', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-text-codes-'));
+  const filePath = path.join(directory, 'text-codes.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Text codes',
+    worksheets: [{
+      id: 'codes',
+      name: 'Codes',
+      cells: [['Hex code', 'Binary code', 'Decimal value'], ['0xFF', '0b101', '12.5']]
+    }]
+  };
+
+  try {
+    await exportOfficeFile(payload, filePath);
+    const reopened = await openOfficeFile(filePath);
+    assert.equal(reopened.worksheets[0].cells[1][0], '0xFF');
+    assert.equal(reopened.worksheets[0].cells[1][1], '0b101');
+    assert.equal(reopened.worksheets[0].cells[1][2], 12.5);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+
+test('XLSX export counts significant digits without counting exponent digits', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-exponent-'));
+  const filePath = path.join(directory, 'scientific-values.xlsx');
+  const fifteenDigits = '1.23456789012345e+100';
+  const sixteenDigits = '1.234567890123456e+100';
+  const payload = {
+    kind: 'sheets',
+    title: 'Scientific values',
+    worksheets: [{
+      id: 'scientific',
+      name: 'Scientific',
+      cells: [['Fifteen digits', 'Sixteen digits'], [fifteenDigits, sixteenDigits]]
+    }]
+  };
+
+  try {
+    await exportOfficeFile(payload, filePath);
+    const reopened = await openOfficeFile(filePath);
+    const row = reopened.worksheets[0].cells[1];
+    assert.equal(typeof row[0], 'number');
+    assert.equal(row[0], Number(fifteenDigits));
+    assert.equal(row[1], sixteenDigits);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+
+test('XLSX export preserves non-zero values that underflow JavaScript numbers', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-underflow-'));
+  const filePath = path.join(directory, 'underflow.xlsx');
+  const positiveTiny = '1e-999';
+  const negativeTiny = '-1e-999';
+  const payload = {
+    kind: 'sheets',
+    title: 'Tiny values',
+    worksheets: [{
+      id: 'tiny',
+      name: 'Tiny',
+      cells: [['Positive', 'Negative', 'Zero'], [positiveTiny, negativeTiny, '0e-999']]
+    }]
+  };
+
+  try {
+    await exportOfficeFile(payload, filePath);
+    const reopened = await openOfficeFile(filePath);
+    const row = reopened.worksheets[0].cells[1];
+    assert.equal(row[0], positiveTiny);
+    assert.equal(row[1], negativeTiny);
+    assert.equal(row[2], 0);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('XLSX round trip keeps table column names in sync after a header cell edit', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-edited-table-header-'));
+  const filePath = path.join(directory, 'edited-header.xlsx');
+  const projectPath = path.join(directory, 'edited-header.bdesk');
+  const cells = [['Product', 'Amount'], ['Pen', 10], ['Paper', 20]];
+  const workbook = {
+    title: 'Sales',
+    activeWorksheetId: 'sales',
+    cells,
+    styles: {},
+    tables: [],
+    worksheets: [{
+      id: 'sales',
+      name: 'Sales',
+      cells,
+      styles: {},
+      tables: []
+    }]
+  };
+
+  try {
+    const table = createWorkbookTable(workbook, {
+      top: 0, left: 0, bottom: 2, right: 1
+    }, 'SalesTable');
+    const updated = updateWorkbookTableHeader(workbook, 0, 1, 'Revenue');
+    assert.equal(updated.id, table.id);
+    assert.deepEqual(updated.columns, ['Product', 'Revenue']);
+    assert.deepEqual(workbook.cells[0], ['Product', 'Revenue']);
+
+    const project = {
+      title: workbook.title,
+      docs: {
+        sheets: {
+          title: workbook.title,
+          activeWorksheetId: workbook.activeWorksheetId,
+          cells: workbook.cells,
+          styles: workbook.styles,
+          tables: workbook.tables,
+          worksheets: workbook.worksheets
+        }
+      }
+    };
+    await exportOfficeFile({ project }, projectPath);
+    const reopenedProject = await openOfficeFile(projectPath);
+    assert.deepEqual(reopenedProject.docs.sheets.worksheets[0].cells[0], ['Product', 'Revenue']);
+    assert.deepEqual(reopenedProject.docs.sheets.worksheets[0].tables[0].columns, ['Product', 'Revenue']);
+
+    await exportOfficeFile({
+      kind: 'sheets',
+      title: workbook.title,
+      activeWorksheetId: workbook.activeWorksheetId,
+      worksheets: workbook.worksheets
+    }, filePath);
+
+    const reopened = await openOfficeFile(filePath);
+    assert.deepEqual(reopened.worksheets[0].cells[0], ['Product', 'Revenue']);
+    assert.deepEqual(reopened.worksheets[0].tables[0].columns, ['Product', 'Revenue']);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('file service keeps a single active import, export and validation implementation', async () => {
+  const source = await fs.readFile(path.join(__dirname, '../src/file-service.js'), 'utf8');
+  for (const declaration of [
+    /^async function openOfficeFile\(/gm,
+    /^async function exportOfficeFile\(/gm,
+    /^function validateProject\(/gm,
+    /^module\.exports =/gm
+  ]) {
+    assert.equal([...source.matchAll(declaration)].length, 1);
+  }
+});
+
+test('XLSX import and export preserve formula expressions in worksheet cells', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'brightdesk-xlsx-formulas-'));
+  const filePath = path.join(directory, 'formulas.xlsx');
+  const payload = {
+    kind: 'sheets',
+    title: 'Formula workbook',
+    activeWorksheetId: 'formulas',
+    worksheets: [{
+      id: 'formulas',
+      name: 'Formulas',
+      cells: [
+        ['Item', 'Net', 'Gross'],
+        ['Pen', 10, '=B2*1.1'],
+        ['Paper', 20, '=SUM(B2:B3)*1.1']
+      ]
+    }]
+  };
+
+  try {
+    await exportOfficeFile(payload, filePath);
+    const reopened = await openOfficeFile(filePath);
+    assert.deepEqual(reopened.worksheets[0].cells, payload.worksheets[0].cells);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+

@@ -32,7 +32,12 @@ const installableCatalog = catalog.filter(item => item.availability === 'availab
 const state = {
   app: launchAppId || 'pages', view: 'workspace', docs: structuredClone(defaults),
   todoView: 'my-day', todoQuery: '',
-  selectedCell: { row: 0, col: 0 }, update: null, ribbonTab: 'home',
+  selectedCell: { row: 0, col: 0 },
+  selectionAnchor: { row: 0, col: 0 },
+  selectedRange: { top: 0, left: 0, bottom: 0, right: 0, rowCount: 1, columnCount: 1, cellCount: 1 },
+  pendingMouseSelection: false, extendSelectionOnClick: false,
+  sheetFilterMenuColumn: null, sheetFilterValues: [], sheetPendingFilterValues: new Set(), sheetFilterSearch: '',
+  update: null, ribbonTab: 'home',
   installedApps: [], setupComplete: false, firstRunSelection: new Set(installableCatalog.map(item => item.id)),
   slideTheme: 'lavender', focusMode: false, editorZoom: 100, sheetZoom: 100,
   languageCatalog: [], installedLanguagePacks: [], spellCheckerLanguages: [], usesNativeMacSpellChecker: false,
@@ -42,19 +47,68 @@ const state = {
 const editor = $('editor'), sheetWrap = $('sheet-wrap'), slideWrap = $('slide-wrap'), notesWrap = $('notes-wrap');
 const pageLayout = window.BrightdeskPageLayout;
 const commonJsonStorage = window.BrightdeskCommonLibs;
+const workbookModel = window.BrightdeskWorkbookModel;
+const sheetNavigation = window.BrightdeskSheetNavigation;
+const sheetHistory = window.BrightdeskSheetHistory;
+const cellFormatting = window.BrightdeskCellFormatting;
+const sheetClipboard = window.BrightdeskSheetClipboard;
+const sheetRange = window.BrightdeskSheetRange;
+const sheetDataTools = window.BrightdeskSheetDataTools;
+const sheetTables = window.BrightdeskSheetTables;
+const sheetFill = window.BrightdeskSheetFill;
 if (!commonJsonStorage) throw new Error('Brightdesk common storage helper was not loaded.');
+if (!workbookModel) throw new Error('Brightdesk worksheet model was not loaded.');
+if (!sheetNavigation) throw new Error('Brightdesk sheet navigation helpers were not loaded.');
+if (!sheetHistory) throw new Error('Brightdesk sheet history helpers were not loaded.');
+if (!cellFormatting) throw new Error('Brightdesk cell formatting helpers were not loaded.');
+if (!sheetClipboard) throw new Error('Brightdesk sheet clipboard helpers were not loaded.');
+if (!sheetRange) throw new Error('Brightdesk worksheet range helpers were not loaded.');
+if (!sheetDataTools) throw new Error('Brightdesk worksheet filter and sort helpers were not loaded.');
+if (!sheetTables) throw new Error('Brightdesk structured table helpers were not loaded.');
+if (!sheetFill) throw new Error('Brightdesk Fill Down/Right helpers were not loaded.');
+const workbookHistory = sheetHistory.createHistory({ limit: 100, clone });
 
 function clone(value) { return commonJsonStorage.cloneJsonValue(value); }
 function activeDoc() { return state.docs[state.app]; }
-function setStatus(message) { $('save-status').textContent = message; }
+function setStatus(message) {
+  $('save-status').textContent = message;
+  const sheetMessage = $('sheet-status-message');
+  if (sheetMessage) sheetMessage.textContent = message;
+}
+function recordSheetHistory() {
+  if (state.app !== 'sheets') return;
+  const recorded = sheetHistory.capture(workbookHistory, activeDoc());
+  if (!recorded) setStatus('Undo history is paused for this large workbook to protect memory.');
+}
+function applySheetHistory(direction) {
+  if (state.app !== 'sheets') return;
+  const current = clone(activeDoc());
+  const restored = direction === 'undo'
+    ? sheetHistory.undo(workbookHistory, current)
+    : sheetHistory.redo(workbookHistory, current);
+  if (!restored) { setStatus(direction === 'undo' ? 'Nothing to undo' : 'Nothing to redo'); return; }
+  state.docs.sheets = workbookModel.normalizeWorkbook(restored, defaults.sheets.cells);
+  resetSheetSelection();
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus(direction === 'undo' ? 'Change undone' : 'Change redone');
+}
 function persist() {
-  try { commonJsonStorage.writeJsonValue(localStorage, 'brightdesk-docs-v3', state.docs); setStatus('Saved on this device'); }
-  catch (error) { setStatus('Could not save locally'); console.error(error); }
+  try {
+    if (state.docs.sheets && Array.isArray(state.docs.sheets.worksheets)) {
+      sheetTables.synchronizeWorkbookTableHeaders(state.docs.sheets);
+      workbookModel.syncActiveWorksheet(state.docs.sheets);
+    }
+    commonJsonStorage.writeJsonValue(localStorage, 'brightdesk-docs-v3', state.docs);
+    setStatus('Saved on this device');
+  } catch (error) { setStatus('Could not save locally'); console.error(error); }
 }
 function loadLocal() {
   try {
     const stored = commonJsonStorage.readJsonValue(localStorage, 'brightdesk-docs-v3', { fallbackKeys: ['brightdesk-docs-v2'], fallbackValue: null });
     if (stored && typeof stored === 'object') state.docs = { ...clone(defaults), ...stored };
+    state.docs.sheets = workbookModel.normalizeWorkbook(state.docs.sheets, defaults.sheets.cells);
     const appSetup = commonJsonStorage.readJsonValue(localStorage, 'brightdesk-app-setup-v1', { fallbackValue: null });
     if (appSetup && Array.isArray(appSetup.installedApps)) {
       state.installedApps = launchAppId ? [launchAppId] : appSetup.installedApps.filter(id => installableCatalog.some(item => item.id === id));
@@ -99,8 +153,231 @@ function safeHtml(html) {
 }
 function letter(n) { let result = ''; for (n++; n > 0; n = Math.floor((n - 1) / 26)) result = String.fromCharCode(65 + (n - 1) % 26) + result; return result; }
 function cellRaw(row, col) { return String(activeDoc().cells?.[row]?.[col] ?? ''); }
-function cellNumeric(row, col) { return window.BrightdeskFormula.calculateCell(activeDoc().cells || [], row, col); }
+function cellNumeric(row, col) {
+  const doc = activeDoc();
+  return window.BrightdeskFormula.calculateCell(doc.cells || [], row, col, new Set(), {
+    worksheets: Array.isArray(doc.worksheets) ? doc.worksheets : [],
+    activeWorksheetId: doc.activeWorksheetId
+  });
+}
 function colIndex(label) { return window.BrightdeskFormula.columnIndex(label); }
+function selectedCellAddress() {
+  return sheetNavigation.formatCellAddress(state.selectedCell.row, state.selectedCell.col);
+}
+function selectedCellStyle() {
+  return cellFormatting.normalizeCellStyle(activeDoc().styles?.[selectedCellAddress()]);
+}
+function formattedCellValue(row, col) {
+  const address = sheetNavigation.formatCellAddress(row, col);
+  return cellFormatting.formatCellDisplay(String(cellNumeric(row, col) ?? ''), activeDoc().styles?.[address]);
+}
+function applyCellVisualStyle(input, row, col) {
+  const address = sheetNavigation.formatCellAddress(row, col);
+  const style = cellFormatting.normalizeCellStyle(activeDoc().styles?.[address]);
+  input.style.fontWeight = style.bold ? '700' : '';
+  input.style.fontStyle = style.italic ? 'italic' : '';
+  input.style.textDecoration = style.underline ? 'underline' : '';
+  input.style.backgroundColor = style.fill || '';
+  input.style.color = style.color || '';
+}
+function applySelectedCellStyle(changes) {
+  const range = currentSheetRange();
+  const currentStyles = activeDoc().styles || {};
+  const nextStyles = cellFormatting.updateCellStylesInRange(currentStyles, range, changes);
+  if (JSON.stringify(nextStyles) === JSON.stringify(currentStyles)) return;
+  recordSheetHistory();
+  activeDoc().styles = nextStyles;
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus(selectedRangeStatus('Formatted', range));
+}
+function currentSheetRange() {
+  return sheetRange.normalizeRange(state.selectedRange || {
+    top: state.selectedCell.row, left: state.selectedCell.col,
+    bottom: state.selectedCell.row, right: state.selectedCell.col
+  });
+}
+function applySheetRangeHighlight() {
+  const range = currentSheetRange();
+  sheetWrap.querySelectorAll('input.grid-cell').forEach(input => {
+    const row = Number(input.dataset.row), col = Number(input.dataset.col);
+    const selected = row >= range.top && row <= range.bottom && col >= range.left && col <= range.right;
+    input.classList.toggle('in-selected-range', selected);
+    input.setAttribute('aria-selected', String(selected));
+  });
+}
+function resetSheetSelection(row = 0, col = 0) {
+  state.selectedCell = { row, col };
+  state.selectionAnchor = { row, col };
+  state.selectedRange = sheetRange.rangeFromCells(state.selectedCell, state.selectedCell);
+  state.pendingMouseSelection = false;
+  state.extendSelectionOnClick = false;
+}
+function selectedSheetClipboardGrid() {
+  const range = currentSheetRange();
+  const grid = sheetRange.extractRangeValues(activeDoc().cells || [], range);
+  const active = document.activeElement;
+  if (active && active.classList && active.classList.contains('grid-cell') && active.dataset.edited === 'true') {
+    const row = Number(active.dataset.row), col = Number(active.dataset.col);
+    if (row >= range.top && row <= range.bottom && col >= range.left && col <= range.right) {
+      grid[row - range.top][col - range.left] = active.value;
+    }
+  }
+  return grid;
+}
+function selectedRangeStatus(verb, range) {
+  return range.rowCount === 1 && range.columnCount === 1
+    ? verb + ' ' + sheetNavigation.formatCellAddress(range.top, range.left)
+    : verb + ' ' + range.rowCount + ' rows × ' + range.columnCount + ' columns';
+}
+function selectedCellClipboardValue() {
+  const { row, col } = state.selectedCell;
+  const active = document.activeElement;
+  if (active?.classList?.contains('grid-cell') &&
+      Number(active.dataset.row) === row && Number(active.dataset.col) === col) {
+    return active.value;
+  }
+  return cellRaw(row, col);
+}
+function writeSelectedCellToClipboard(event, value = selectedSheetClipboardGrid()) {
+  if (state.app !== 'sheets' || !event.clipboardData) return false;
+  event.clipboardData.setData('text/plain', sheetClipboard.serializeClipboardGrid(value));
+  event.preventDefault();
+  return true;
+}
+function cutSelectedSheetCell(event) {
+  const range = currentSheetRange();
+  const values = selectedSheetClipboardGrid();
+  if (!writeSelectedCellToClipboard(event, values)) return;
+  const active = document.activeElement;
+  if (active && active.classList && active.classList.contains('grid-cell') && active.dataset.edited === 'true') {
+    const row = Number(active.dataset.row), col = Number(active.dataset.col);
+    activeDoc().cells[row][col] = active.value;
+    active.dataset.edited = 'false';
+  }
+  recordSheetHistory();
+  activeDoc().cells = sheetRange.clearRangeValues(activeDoc().cells || [], range);
+  persist();
+  refreshSheetAfterFilterableEdit();
+  renderToolbar();
+  updateSheetFormulaBar();
+  setStatus(selectedRangeStatus('Cut', range));
+}
+function pasteIntoSelectedSheetCell(event) {
+  if (state.app !== 'sheets' || !event.clipboardData) return;
+  event.preventDefault();
+  const clipboardTypes = Array.from(event.clipboardData.types || []);
+  if (!clipboardTypes.includes('text/plain')) return;
+  const text = event.clipboardData.getData('text/plain');
+  try {
+    const clipboardGrid = sheetClipboard.parseClipboardGrid(text);
+    const range = currentSheetRange();
+    const row = range.top, col = range.left;
+    const activeInput = document.activeElement;
+    const editedCell = activeInput?.classList?.contains('grid-cell') && activeInput.dataset.edited === 'true'
+      ? { row: Number(activeInput.dataset.row), col: Number(activeInput.dataset.col), value: activeInput.value }
+      : null;
+    const sourceCells = activeDoc().cells.map(line => line.slice());
+    if (editedCell) sourceCells[editedCell.row][editedCell.col] = editedCell.value;
+    const nextCells = sheetClipboard.pasteClipboardGrid(sourceCells, row, col, clipboardGrid);
+    const activeId = activeDoc().activeWorksheetId;
+    const otherCellCount = activeDoc().worksheets
+      .filter(sheet => sheet.id !== activeId)
+      .reduce((total, sheet) => total + (sheet.cells || []).reduce((count, line) => count + line.length, 0), 0);
+    const nextCellCount = nextCells.reduce((count, line) => count + line.length, 0);
+    if (otherCellCount + nextCellCount > sheetNavigation.MAX_SHEET_CELLS) {
+      throw new RangeError('The paste would exceed the 250,000-cell workbook limit.');
+    }
+    if (editedCell) activeDoc().cells[editedCell.row][editedCell.col] = editedCell.value;
+    recordSheetHistory();
+    if (editedCell) activeInput.dataset.edited = 'false';
+    activeDoc().cells = nextCells;
+    persist();
+    renderSheet();
+    renderToolbar();
+    const targetInput = sheetWrap.querySelector(`input.grid-cell[data-row="${row}"][data-col="${col}"]`);
+    targetInput?.focus({ preventScroll: true });
+    const columns = clipboardGrid.reduce((maximum, line) => Math.max(maximum, line.length), 0);
+    setStatus(`Pasted ${clipboardGrid.length} rows × ${columns} columns at ${sheetNavigation.formatCellAddress(row, col)}`);
+  } catch (error) {
+    setStatus(`Paste failed: ${error.message}`);
+  }
+}
+function clearSelectedCellStyle() {
+  const range = currentSheetRange();
+  const currentStyles = activeDoc().styles || {};
+  const nextStyles = cellFormatting.removeCellStylesInRange(currentStyles, range);
+  if (Object.keys(nextStyles).length === Object.keys(currentStyles).length) return;
+  recordSheetHistory();
+  activeDoc().styles = nextStyles;
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus(selectedRangeStatus('Formatting cleared from', range));
+}
+function addCellStyleSelect(container, labelText, options, value, onChange) {
+  const wrapper = document.createElement('label');
+  wrapper.className = 'sheet-format-control';
+  wrapper.textContent = labelText;
+  const select = document.createElement('select');
+  select.setAttribute('aria-label', labelText);
+  options.forEach(([optionValue, optionLabel]) => {
+    const option = document.createElement('option');
+    option.value = optionValue;
+    option.textContent = optionLabel;
+    select.append(option);
+  });
+  select.value = value;
+  select.addEventListener('change', () => onChange(select.value));
+  wrapper.append(select);
+  container.append(wrapper);
+  return select;
+}
+function updateSheetFormulaBar() {
+  if (state.app !== 'sheets') return;
+  const nameBox = $('sheet-name-box');
+  const formula = $('formula-input');
+  const address = sheetNavigation.formatCellAddress(state.selectedCell.row, state.selectedCell.col);
+  if (nameBox && document.activeElement !== nameBox) nameBox.value = address;
+  if (formula && document.activeElement !== formula) formula.value = cellRaw(state.selectedCell.row, state.selectedCell.col);
+  const selection = $('sheet-status-selection');
+  if (selection) {
+    const range = currentSheetRange();
+    const start = sheetNavigation.formatCellAddress(range.top, range.left);
+    const end = sheetNavigation.formatCellAddress(range.bottom, range.right);
+    selection.textContent = range.cellCount > 1 ? `Range ${start}:${end} · ${range.cellCount} cells` : `Cell ${address}`;
+  }
+  const dimensions = $('sheet-status-size');
+  if (dimensions) {
+    const rows = activeDoc().cells || [];
+    dimensions.textContent = `${rows.length} rows × ${rows.reduce((maximum, row) => Math.max(maximum, row.length), 12)} columns`;
+  }
+  const zoom = $('sheet-zoom-value');
+  if (zoom) zoom.textContent = `${state.sheetZoom}%`;
+}
+function jumpToSheetCell(reference) {
+  let target;
+  try {
+    target = sheetNavigation.parseCellAddress(reference);
+    sheetNavigation.ensureCellExists(activeDoc().cells, target.row, target.col);
+  } catch (error) {
+    setStatus(error.message);
+    return false;
+  }
+  resetSheetSelection(target.row, target.col);
+  persist();
+  renderSheet();
+  renderToolbar();
+  const input = sheetWrap.querySelector(`input[data-row="${target.row}"][data-col="${target.col}"]`);
+  if (input) {
+    input.focus({ preventScroll: true });
+    input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+  updateSheetFormulaBar();
+  setStatus(`Selected ${sheetNavigation.formatCellAddress(target.row, target.col)}`);
+  return true;
+}
 const ribbonTabs = {
   pages: ['home', 'insert', 'layout', 'review', 'view'],
   sheets: ['home', 'insert', 'formulas', 'data', 'view'],
@@ -178,19 +455,53 @@ function renderToolbar() {
     }
   } else if (app === 'sheets') {
     if (tab === 'home') {
-      const cell = group('cell');
-      const ref = document.createElement('span'); ref.className = 'cell-ref'; ref.textContent = `${letter(state.selectedCell.col)}${state.selectedCell.row + 1}`; cell.append(ref);
-      const formula = document.createElement('input'); formula.id = 'formula-input'; formula.className = 'formula-input'; formula.placeholder = label('enterValue'); formula.value = cellRaw(state.selectedCell.row, state.selectedCell.col);
-      formula.addEventListener('change', () => { setCell(state.selectedCell.row, state.selectedCell.col, formula.value); refreshSheetValues(); }); cell.append(formula);
       const grid = group('cells'); addButton(grid, `+ ${label('row')}`, () => addSheetRow()); addButton(grid, `+ ${label('column')}`, () => addSheetColumn());
+      const style = selectedCellStyle();
+      const formatting = ribbonGroup(toolbar, 'Cell formatting');
+      for (const [caption, property] of [['B', 'bold'], ['I', 'italic'], ['U', 'underline']]) {
+        const button = addButton(formatting, caption, () => applySelectedCellStyle({ [property]: !selectedCellStyle()[property] }), property[0].toUpperCase() + property.slice(1));
+        button.setAttribute('aria-pressed', String(style[property]));
+        button.classList.toggle('active', style[property]);
+      }
+      addCellStyleSelect(formatting, 'Fill', [
+        ['', 'None'], ['#EDF7F1', 'Soft green'], ['#FFF4CE', 'Soft yellow'], ['#F1F3F5', 'Light grey']
+      ], style.fill || '', value => applySelectedCellStyle({ fill: value || null }));
+      addCellStyleSelect(formatting, 'Text', [
+        ['', 'Default'], ['#1E6847', 'Dark green'], ['#24334B', 'Navy'], ['#8A3434', 'Dark red']
+      ], style.color || '', value => applySelectedCellStyle({ color: value || null }));
+      addCellStyleSelect(formatting, 'Number', [
+        ['general', 'General'], ['number', 'Number'], ['currency', 'Currency (AUD)'], ['percent', 'Percentage'], ['date', 'Date']
+      ], style.numberFormat, value => applySelectedCellStyle({ numberFormat: value }));
+      addButton(formatting, 'Clear format', clearSelectedCellStyle, 'Clear formatting on the selected cell');
+      const editing = group('editing');
+      addButton(editing, 'Undo', () => applySheetHistory('undo'), 'Undo the last spreadsheet change');
+      addButton(editing, 'Redo', () => applySheetHistory('redo'), 'Redo the last undone spreadsheet change');
+      const fill = group('fill');
+      addButton(fill, 'Fill Down', fillSelectedRangeDown, 'Repeat the first selected row down the selected range');
+      addButton(fill, 'Fill Right', fillSelectedRangeRight, 'Repeat the first selected column across the selected range');
     } else if (tab === 'insert') {
-      const insert = group('tools'); addButton(insert, label('newRow'), addSheetRow); addButton(insert, label('newColumn'), addSheetColumn);
+      const insert = group('tools');
+      addButton(insert, label('newRow'), addSheetRow);
+      addButton(insert, label('newColumn'), addSheetColumn);
+      addButton(insert, 'Table', createStructuredTable, 'Create a formatted table from the selected cell range');
     } else if (tab === 'formulas') {
       const fn = group('functions');
       ['SUM','AVERAGE','MIN','MAX','COUNT'].forEach(name => addButton(fn, name, () => insertColumnFormula(name), `Insert ${name} formula for the selected column`));
     } else if (tab === 'data') {
       const data = group('sort');
-      addButton(data, label('sortAZ'), () => sortSheetColumn(false)); addButton(data, label('sortZA'), () => sortSheetColumn(true));
+      addButton(data, label('sortAZ'), () => sortSheetColumn(false));
+      addButton(data, label('sortZA'), () => sortSheetColumn(true));
+      const filterButton = addButton(data, 'Filter', toggleSheetAutoFilter, 'Turn worksheet filters on or off');
+      filterButton.setAttribute('aria-pressed', String(activeDoc().autoFilter?.enabled === true));
+      filterButton.classList.toggle('active', activeDoc().autoFilter?.enabled === true);
+      const clearFilters = addButton(data, 'Clear all filters', clearAllSheetFilters, 'Show all rows on this worksheet');
+      clearFilters.disabled = !Object.keys(activeDoc().autoFilter?.filters || {}).length;
+      const table = selectedStructuredTable();
+      addButton(data, 'Format as Table', createStructuredTable, 'Create a structured table from the selected cell range');
+      const renameTable = addButton(data, 'Rename Table', renameStructuredTable, 'Rename the table containing the selected cell');
+      renameTable.disabled = !table;
+      const convertTable = addButton(data, 'Convert to Range', convertStructuredTableToRange, 'Keep the table data and formatting but remove table behaviour');
+      convertTable.disabled = !table;
     } else {
       const view = group('zoom');
       addButton(view, label('zoomOut'), () => changeSheetZoom(-10)); addButton(view, `${state.sheetZoom}%`, () => { state.sheetZoom = 100; applySheetZoom(); }); addButton(view, label('zoomIn'), () => changeSheetZoom(10));
@@ -233,21 +544,409 @@ function renderToolbar() {
     addButton(dictionaryTools, 'Check spelling', checkCurrentDocumentSpelling, 'Check this document with the selected open-source dictionary');
   }
 }
-function addSheetRow() { const cells = activeDoc().cells; cells.push(Array(cells[0]?.length || 12).fill('')); renderSheet(); persist(); }
-function addSheetColumn() { activeDoc().cells.forEach(row => row.push('')); renderSheet(); persist(); }
+function fillSelectedRangeDown() {
+  const range = currentSheetRange();
+  if (range.rowCount < 2) { setStatus('Select at least two rows to Fill Down.'); return; }
+  try {
+    const cells = sheetFill.fillRangeDown(activeDoc().cells || [], range);
+    const styles = cellFormatting.fillCellStylesDown(activeDoc().styles || {}, range);
+    const otherCellCount = activeDoc().worksheets
+      .filter(sheet => sheet.id !== activeDoc().activeWorksheetId)
+      .reduce((total, sheet) => total + (sheet.cells || []).reduce((count, line) => count + line.length, 0), 0);
+    const nextCellCount = cells.reduce((count, line) => count + line.length, 0);
+    if (otherCellCount + nextCellCount > sheetNavigation.MAX_SHEET_CELLS) {
+      throw new RangeError('Fill Down would exceed the 250,000-cell workbook limit.');
+    }
+    recordSheetHistory();
+    activeDoc().cells = cells;
+    activeDoc().styles = styles;
+    persist();
+    renderSheet();
+    renderToolbar();
+    setStatus(selectedRangeStatus('Filled down', range));
+  } catch (error) { setStatus('Fill Down failed: ' + error.message); }
+}
+function fillSelectedRangeRight() {
+  const range = currentSheetRange();
+  if (range.columnCount < 2) { setStatus('Select at least two columns to Fill Right.'); return; }
+  try {
+    const cells = sheetFill.fillRangeRight(activeDoc().cells || [], range);
+    const styles = cellFormatting.fillCellStylesRight(activeDoc().styles || {}, range);
+    const otherCellCount = activeDoc().worksheets
+      .filter(sheet => sheet.id !== activeDoc().activeWorksheetId)
+      .reduce((total, sheet) => total + (sheet.cells || []).reduce((count, line) => count + line.length, 0), 0);
+    const nextCellCount = cells.reduce((count, line) => count + line.length, 0);
+    if (otherCellCount + nextCellCount > sheetNavigation.MAX_SHEET_CELLS) {
+      throw new RangeError('Fill Right would exceed the 250,000-cell workbook limit.');
+    }
+    recordSheetHistory();
+    activeDoc().cells = cells;
+    activeDoc().styles = styles;
+    persist();
+    renderSheet();
+    renderToolbar();
+    setStatus(selectedRangeStatus('Filled right', range));
+  } catch (error) { setStatus('Fill Right failed: ' + error.message); }
+}
+function addSheetRow() {
+  try {
+    const cells = sheetNavigation.appendSheetRow(activeDoc().cells || []);
+    recordSheetHistory();
+    activeDoc().cells = cells;
+    renderSheet();
+    persist();
+  } catch (error) { setStatus('Could not add row: ' + error.message); }
+}
+function addSheetColumn() {
+  try {
+    const cells = sheetNavigation.appendSheetColumn(activeDoc().cells || []);
+    recordSheetHistory();
+    activeDoc().cells = cells;
+    renderSheet();
+    persist();
+  } catch (error) { setStatus('Could not add column: ' + error.message); }
+}
 function insertColumnFormula(name) {
   const { row, col } = state.selectedCell; const column = letter(col);
   const start = row > 0 ? 1 : 2; const end = row > 0 ? row : Math.max(6, row + 6);
   const value = `=${name}(${column}${start}:${column}${end})`; setCell(row, col, value); renderSheet();
 }
+function resolveSheetFilterValue({ row, col }) {
+  return cellNumeric(row, col);
+}
+function visibleSheetRowIndexes() {
+  return sheetDataTools.getVisibleRowIndexes(activeDoc().cells || [], activeDoc().autoFilter || sheetDataTools.createAutoFilterState(), {
+    resolveValue: resolveSheetFilterValue
+  });
+}
+function keepSelectedSheetCellVisible() {
+  const visibleRows = visibleSheetRowIndexes();
+  if (visibleRows.includes(state.selectedCell.row)) return false;
+  const nextRow = visibleRows.find(row => row > 0) ?? visibleRows[0] ?? 0;
+  resetSheetSelection(nextRow, state.selectedCell.col);
+  return true;
+}
+function refreshSheetAfterFilterableEdit() {
+  if (!activeDoc().autoFilter?.enabled) {
+    refreshSheetValues();
+    return false;
+  }
+  const moved = keepSelectedSheetCellVisible();
+  if (moved) {
+    renderSheet();
+    renderToolbar();
+    const target = sheetWrap.querySelector(
+      'input.grid-cell[data-row="' + state.selectedCell.row + '"][data-col="' + state.selectedCell.col + '"]'
+    );
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    updateSheetFormulaBar();
+    return true;
+  }
+  refreshSheetValues();
+  return false;
+}
+function toggleSheetAutoFilter() {
+  const current = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter);
+  recordSheetHistory();
+  activeDoc().autoFilter = sheetDataTools.setAutoFilterEnabled(current, !current.enabled);
+  state.sheetFilterMenuColumn = null;
+  if (current.enabled) state.sheetFilterSearch = '';
+  keepSelectedSheetCellVisible();
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus(activeDoc().autoFilter.enabled ? 'Filters are on for this worksheet' : 'Filters are off for this worksheet');
+}
+function clearAllSheetFilters() {
+  const current = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter);
+  if (!Object.keys(current.filters).length) {
+    setStatus('There are no active column filters to clear');
+    return;
+  }
+  recordSheetHistory();
+  activeDoc().autoFilter = sheetDataTools.clearAllColumnFilters(current);
+  state.sheetFilterMenuColumn = null;
+  state.sheetFilterSearch = '';
+  keepSelectedSheetCellVisible();
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus('All column filters cleared');
+}
+function clearSheetColumnFilter(column) {
+  recordSheetHistory();
+  activeDoc().autoFilter = sheetDataTools.clearColumnFilter(activeDoc().autoFilter, column);
+  state.sheetFilterMenuColumn = null;
+  state.sheetFilterSearch = '';
+  keepSelectedSheetCellVisible();
+  persist();
+  renderSheet();
+  renderToolbar();
+  focusSheetFilterTrigger(column);
+  setStatus('Filter cleared for column ' + letter(column));
+}
+function applySheetColumnFilter(column) {
+  const values = state.sheetFilterValues;
+  const selected = [...state.sheetPendingFilterValues];
+  const allSelected = selected.length === values.length && values.every(value => state.sheetPendingFilterValues.has(value));
+  recordSheetHistory();
+  activeDoc().autoFilter = allSelected
+    ? sheetDataTools.clearColumnFilter(activeDoc().autoFilter, column)
+    : sheetDataTools.setColumnFilter(activeDoc().autoFilter, column, selected);
+  state.sheetFilterMenuColumn = null;
+  state.sheetFilterSearch = '';
+  keepSelectedSheetCellVisible();
+  persist();
+  renderSheet();
+  renderToolbar();
+  focusSheetFilterTrigger(column);
+  const activeFilters = Object.keys(activeDoc().autoFilter.filters).length;
+  const visibleCount = Math.max(0, visibleSheetRowIndexes().length - 1);
+  const dataCount = Math.max(0, (activeDoc().cells || []).length - 1);
+  setStatus('Showing ' + visibleCount + ' of ' + dataCount + ' data rows · ' + activeFilters + ' column filter' + (activeFilters === 1 ? '' : 's'));
+}
+function openSheetFilterMenu(column) {
+  if (!activeDoc().autoFilter?.enabled) {
+    setStatus('Turn on Filter from the Data tab first');
+    return;
+  }
+  const values = sheetDataTools.getUniqueColumnValues(activeDoc().cells || [], column, {
+    resolveValue: resolveSheetFilterValue
+  });
+  const filters = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter).filters;
+  const hasSelection = Object.prototype.hasOwnProperty.call(filters, String(column));
+  state.sheetFilterMenuColumn = column;
+  state.sheetFilterValues = values;
+  state.sheetPendingFilterValues = new Set(hasSelection ? filters[String(column)] : values);
+  state.sheetFilterSearch = '';
+  renderSheet();
+  const search = sheetWrap.querySelector('.sheet-filter-search');
+  search?.focus({ preventScroll: true });
+}
+function focusSheetFilterTrigger(column) {
+  const trigger = sheetWrap.querySelector('.sheet-filter-trigger[data-column="' + column + '"]');
+  trigger?.focus({ preventScroll: true });
+}
+function closeSheetFilterMenu() {
+  const column = state.sheetFilterMenuColumn;
+  state.sheetFilterMenuColumn = null;
+  state.sheetFilterSearch = '';
+  renderSheet();
+  if (column !== null) focusSheetFilterTrigger(column);
+}
+function renderSheetFilterMenu(cell, column) {
+  if (state.sheetFilterMenuColumn !== column) return;
+  const menu = document.createElement('div');
+  menu.className = 'sheet-filter-menu';
+  menu.setAttribute('role', 'group');
+  menu.setAttribute('aria-label', 'Filter options for column ' + letter(column));
+  menu.addEventListener('click', event => event.stopPropagation());
+  menu.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeSheetFilterMenu();
+    }
+  });
+
+  const heading = document.createElement('div');
+  heading.className = 'sheet-filter-heading';
+  heading.textContent = 'Filter ' + letter(column);
+  const search = document.createElement('input');
+  search.className = 'sheet-filter-search';
+  search.type = 'search';
+  search.placeholder = 'Search values';
+  search.setAttribute('aria-label', 'Search values in column ' + letter(column));
+  search.value = state.sheetFilterSearch;
+  const actions = document.createElement('div');
+  actions.className = 'sheet-filter-selection-actions';
+  const selectAll = document.createElement('button');
+  selectAll.type = 'button';
+  selectAll.className = 'sheet-filter-link';
+  selectAll.textContent = 'Select all';
+  const selectNone = document.createElement('button');
+  selectNone.type = 'button';
+  selectNone.className = 'sheet-filter-link';
+  selectNone.textContent = 'Clear selection';
+  actions.append(selectAll, selectNone);
+
+  const status = document.createElement('div');
+  status.className = 'sheet-filter-count';
+  status.setAttribute('role', 'status');
+  const options = document.createElement('div');
+  options.className = 'sheet-filter-options';
+  const footer = document.createElement('div');
+  footer.className = 'sheet-filter-footer';
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'sheet-filter-menu-button secondary';
+  clear.textContent = 'Clear filter';
+  clear.disabled = !Object.prototype.hasOwnProperty.call(activeDoc().autoFilter?.filters || {}, String(column));
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'sheet-filter-menu-button secondary';
+  cancel.textContent = 'Cancel';
+  const apply = document.createElement('button');
+  apply.type = 'button';
+  apply.className = 'sheet-filter-menu-button primary';
+  apply.textContent = 'Apply';
+  footer.append(clear, cancel, apply);
+
+  function updateStatus(matchCount) {
+    status.textContent = state.sheetPendingFilterValues.size + ' selected · ' + matchCount + ' values';
+  }
+  function renderOptions() {
+    options.replaceChildren();
+    const query = search.value.trim().toLocaleLowerCase();
+    const matches = state.sheetFilterValues.filter(value =>
+      (value === '' ? '(Blanks)' : value).toLocaleLowerCase().includes(query)
+    );
+    matches.slice(0, 200).forEach(value => {
+      const label = document.createElement('label');
+      label.className = 'sheet-filter-option';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = state.sheetPendingFilterValues.has(value);
+      checkbox.setAttribute('aria-label', value === '' ? '(Blanks)' : value);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) state.sheetPendingFilterValues.add(value);
+        else state.sheetPendingFilterValues.delete(value);
+        updateStatus(matches.length);
+      });
+      const optionLabel = document.createElement('span');
+      optionLabel.textContent = value === '' ? '(Blanks)' : value;
+      label.append(checkbox, optionLabel);
+      options.append(label);
+    });
+    if (matches.length > 200) {
+      const limit = document.createElement('div');
+      limit.className = 'sheet-filter-limit';
+      limit.textContent = 'Showing 200 of ' + matches.length + ' matches. Search to narrow the list.';
+      options.append(limit);
+    }
+    if (!matches.length) {
+      const empty = document.createElement('div');
+      empty.className = 'sheet-filter-empty';
+      empty.textContent = 'No matching values';
+      options.append(empty);
+    }
+    updateStatus(matches.length);
+  }
+  search.addEventListener('input', () => {
+    state.sheetFilterSearch = search.value;
+    renderOptions();
+  });
+  selectAll.addEventListener('click', () => {
+    state.sheetPendingFilterValues = new Set(state.sheetFilterValues);
+    renderOptions();
+  });
+  selectNone.addEventListener('click', () => {
+    state.sheetPendingFilterValues = new Set();
+    renderOptions();
+  });
+  clear.addEventListener('click', () => clearSheetColumnFilter(column));
+  cancel.addEventListener('click', closeSheetFilterMenu);
+  apply.addEventListener('click', () => applySheetColumnFilter(column));
+
+  menu.append(heading, search, actions, status, options, footer);
+  cell.append(menu);
+  renderOptions();
+}
+function allOtherWorksheetTables(doc, activeWorksheetId = doc.activeWorksheetId) {
+  return (doc.worksheets || [])
+    .filter(sheet => sheet.id !== activeWorksheetId)
+    .flatMap(sheet => Array.isArray(sheet.tables) ? sheet.tables : []);
+}
+function selectedStructuredTable() {
+  return sheetTables.findTableAtCell(
+    activeDoc().tables || [],
+    state.selectedCell.row,
+    state.selectedCell.col
+  );
+}
+function createStructuredTable() {
+  const doc = activeDoc();
+  const range = currentSheetRange();
+  if (range.rowCount < 2) {
+    setStatus('Select a header row and at least one data row before formatting as a table');
+    return;
+  }
+  const existingTables = allOtherWorksheetTables(doc);
+  const defaultName = 'Table' + (existingTables.length + (doc.tables || []).length + 1);
+  const requestedName = window.prompt('Table name', defaultName);
+  if (requestedName === null) return;
+  try {
+    recordSheetHistory();
+    const table = sheetTables.createWorkbookTable(doc, range, requestedName);
+    persist();
+    renderSheet();
+    renderToolbar();
+    setStatus('Created table ' + table.name + ' · ' + table.columns.length + ' columns');
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+function renameStructuredTable() {
+  const doc = activeDoc();
+  const table = selectedStructuredTable();
+  if (!table) {
+    setStatus('Select a cell inside a table first');
+    return;
+  }
+  const requestedName = window.prompt('Table name', table.name);
+  if (requestedName === null) return;
+  try {
+    recordSheetHistory();
+    const renamed = sheetTables.renameWorkbookTable(doc, table.id, requestedName);
+    persist();
+    renderSheet();
+    renderToolbar();
+    setStatus('Renamed table to ' + renamed.name);
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+function convertStructuredTableToRange() {
+  const doc = activeDoc();
+  const table = selectedStructuredTable();
+  if (!table) {
+    setStatus('Select a cell inside a table first');
+    return;
+  }
+  if (!window.confirm('Convert ' + table.name + ' to a normal cell range? Your cell values and formatting will remain.')) return;
+  recordSheetHistory();
+  sheetTables.removeWorkbookTable(doc, table.id);
+  persist();
+  renderSheet();
+  renderToolbar();
+  setStatus('Converted ' + table.name + ' to a normal range. Cell values and formatting were kept.');
+}
 function sortSheetColumn(descending) {
-  const col = state.selectedCell.col;
-  activeDoc().cells.sort((a, b) => {
-    const av = String(a[col] ?? '').toLocaleLowerCase(), bv = String(b[col] ?? '').toLocaleLowerCase();
-    const an = Number(av), bn = Number(bv);
-    const result = av !== '' && bv !== '' && Number.isFinite(an) && Number.isFinite(bn) ? an - bn : av.localeCompare(bv);
-    return descending ? -result : result;
-  }); renderSheet(); persist();
+  recordSheetHistory();
+  const doc = activeDoc();
+  const worksheet = doc.worksheets?.find(sheet => sheet.id === doc.activeWorksheetId);
+  const sorted = sheetDataTools.sortWorksheet(doc.cells || [], doc.styles || {}, state.selectedCell.col, {
+    descending,
+    worksheetName: worksheet?.name,
+    resolveValue: resolveSheetFilterValue
+  });
+  doc.cells = sorted.cells;
+  doc.styles = sorted.styles;
+  if (worksheet?.name && sorted.destinationBySourceRow instanceof Map) {
+    for (const otherWorksheet of doc.worksheets || []) {
+      if (otherWorksheet.id === doc.activeWorksheetId || !Array.isArray(otherWorksheet.cells)) continue;
+      otherWorksheet.cells = otherWorksheet.cells.map(row => Array.isArray(row)
+        ? row.map(value => typeof value === 'string'
+          ? sheetDataTools.translateExternalFormulaRow(value, sorted.destinationBySourceRow, worksheet.name)
+          : value)
+        : row);
+    }
+  }
+  persist();
+  keepSelectedSheetCellVisible();
+  renderSheet();
+  renderToolbar();
+  setStatus('Sorted column ' + letter(state.selectedCell.col) + (descending ? ' Z to A' : ' A to Z'));
 }
 function applyPageLayout() {
   if (!pageLayout || state.app !== 'pages') return;
@@ -263,31 +962,318 @@ function applySheetZoom() { sheetWrap.style.zoom = `${state.sheetZoom}%`; setSta
 function insertNoteText(value) { const input = $('notes-editor'); const start = input.selectionStart, end = input.selectionEnd; input.setRangeText(value, start, end, 'end'); activeDoc().text = input.value; persist(); input.focus(); }
 function addSlideWithContent(title, body) { activeDoc().slides.push({ title, body }); activeDoc().current = activeDoc().slides.length - 1; renderSlides(); renderToolbar(); persist(); }
 function setSlideTheme(theme) { state.slideTheme = theme; renderSlides(); setStatus(`${theme[0].toUpperCase()}${theme.slice(1)} theme selected`); }
-function setCell(row,col,value) { while (activeDoc().cells.length <= row) activeDoc().cells.push([]); while (activeDoc().cells[row].length <= col) activeDoc().cells[row].push(''); activeDoc().cells[row][col]=value; persist(); }
+function setCell(row,col,value) {
+  const cells = activeDoc().cells;
+  const current = String(cells?.[row]?.[col] ?? '');
+  if (current === String(value ?? '')) return;
+  recordSheetHistory();
+  const updatedTableHeader = state.app === 'sheets'
+    ? sheetTables.updateWorkbookTableHeader(activeDoc(), row, col, value)
+    : null;
+  if (!updatedTableHeader) {
+    while (activeDoc().cells.length <= row) activeDoc().cells.push([]);
+    while (activeDoc().cells[row].length <= col) activeDoc().cells[row].push('');
+    activeDoc().cells[row][col] = String(value ?? '');
+  }
+  persist();
+}
+function renameWorksheetFromPrompt(worksheetId) {
+  const worksheet = activeDoc().worksheets.find(sheet => sheet.id === worksheetId);
+  if (!worksheet) return;
+  const requestedName = window.prompt('Worksheet name', worksheet.name);
+  if (requestedName === null) return;
+  try {
+    recordSheetHistory();
+    workbookModel.renameWorksheet(activeDoc(), worksheetId, requestedName);
+    renderSheetTabs();
+    renderSheet();
+    renderToolbar();
+    persist();
+  } catch (error) { window.alert(error.message); }
+}
+function deleteWorksheetWithConfirmation(worksheetId) {
+  const worksheet = activeDoc().worksheets.find(sheet => sheet.id === worksheetId);
+  if (!worksheet) return;
+  if (!window.confirm(`Delete the worksheet “${worksheet.name}”? This cannot be undone.`)) return;
+  try {
+    recordSheetHistory();
+    workbookModel.deleteWorksheet(activeDoc(), worksheetId);
+    resetSheetSelection();
+    renderSheet();
+    renderToolbar();
+    persist();
+  } catch (error) { window.alert(error.message); }
+}
+function renderSheetTabs() {
+  const container = $('sheet-tabs');
+  if (!container) return;
+  const doc = activeDoc();
+  const worksheets = Array.isArray(doc.worksheets) ? doc.worksheets : [];
+  container.innerHTML = '';
+  const list = document.createElement('div');
+  list.className = 'sheet-tab-list';
+  list.setAttribute('role', 'tablist');
+  list.setAttribute('aria-label', 'Worksheets');
+  let draggedWorksheetId = '';
+  worksheets.forEach((worksheet, index) => {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'sheet-tab';
+    tab.textContent = worksheet.name;
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', String(worksheet.id === doc.activeWorksheetId));
+    tab.setAttribute('aria-controls', 'sheet-wrap');
+    tab.title = 'Drag to reorder. Double-click or use Rename to change this worksheet name.';
+    tab.draggable = true;
+    tab.addEventListener('click', () => {
+      if (worksheet.id === doc.activeWorksheetId) return;
+      workbookModel.activateWorksheet(doc, worksheet.id);
+      resetSheetSelection();
+      renderSheet();
+      renderToolbar();
+      persist();
+    });
+    tab.addEventListener('dblclick', () => renameWorksheetFromPrompt(worksheet.id));
+    tab.addEventListener('keydown', event => {
+      if (event.key === 'F2') { event.preventDefault(); renameWorksheetFromPrompt(worksheet.id); }
+    });
+    tab.addEventListener('dragstart', event => {
+      draggedWorksheetId = worksheet.id;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', worksheet.id);
+      tab.classList.add('dragging');
+    });
+    tab.addEventListener('dragend', () => { draggedWorksheetId = ''; tab.classList.remove('dragging'); });
+    tab.addEventListener('dragover', event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; });
+    tab.addEventListener('drop', event => {
+      event.preventDefault();
+      const movedId = draggedWorksheetId || event.dataTransfer.getData('text/plain');
+      if (!movedId || movedId === worksheet.id) return;
+      const from = doc.worksheets.findIndex(item => item.id === movedId);
+      if (from < 0) return;
+      recordSheetHistory();
+      workbookModel.moveWorksheet(doc, movedId, index);
+      renderSheetTabs();
+      persist();
+    });
+    list.append(tab);
+  });
+  const actions = document.createElement('div');
+  actions.className = 'sheet-tab-actions';
+  const add = document.createElement('button');
+  add.type = 'button'; add.className = 'sheet-tab-action'; add.textContent = '+ Sheet';
+  add.setAttribute('aria-label', 'Add worksheet');
+  add.disabled = worksheets.length >= workbookModel.MAX_WORKSHEETS;
+  add.title = add.disabled
+    ? `A workbook can contain up to ${workbookModel.MAX_WORKSHEETS} worksheets`
+    : 'Add worksheet';
+  add.addEventListener('click', () => {
+    recordSheetHistory();
+    workbookModel.addWorksheet(doc);
+    resetSheetSelection();
+    renderSheet(); renderToolbar(); persist();
+  });
+  const rename = document.createElement('button');
+  rename.type = 'button'; rename.className = 'sheet-tab-action'; rename.textContent = 'Rename';
+  rename.addEventListener('click', () => renameWorksheetFromPrompt(doc.activeWorksheetId));
+  const remove = document.createElement('button');
+  remove.type = 'button'; remove.className = 'sheet-tab-action'; remove.textContent = 'Delete';
+  remove.disabled = worksheets.length <= 1;
+  remove.addEventListener('click', () => deleteWorksheetWithConfirmation(doc.activeWorksheetId));
+  actions.append(add, rename, remove);
+  container.append(list, actions);
+}
 function refreshSheetValues() {
   sheetWrap.querySelectorAll('input.grid-cell').forEach(input => {
     if (document.activeElement === input) return;
     const row = Number(input.dataset.row), col = Number(input.dataset.col);
-    input.value = String(cellNumeric(row, col));
+    input.value = formattedCellValue(row, col);
+    applyCellVisualStyle(input, row, col);
   });
-  const formula = $('formula-input');
-  if (formula && document.activeElement !== formula) formula.value = cellRaw(state.selectedCell.row, state.selectedCell.col);
+  updateSheetFormulaBar();
 }
+function navigateSheetCell(input, event) {
+  const row = Number(input.dataset.row);
+  const col = Number(input.dataset.col);
+  if ((event.ctrlKey || event.metaKey) && ['z', 'y'].includes(event.key.toLowerCase())) {
+    event.preventDefault();
+    if (input.dataset.edited === 'true') {
+      setCell(row, col, input.value);
+      input.dataset.edited = 'false';
+    }
+    applySheetHistory(event.key.toLowerCase() === 'z' && !event.shiftKey ? 'undo' : 'redo');
+    return true;
+  }
+  const target = sheetNavigation.getKeyboardNavigationTarget({
+    row,
+    col,
+    key: event.key,
+    shiftKey: event.shiftKey,
+    value: input.value,
+    selectionStart: input.selectionStart,
+    selectionEnd: input.selectionEnd
+  });
+  if (!target) return false;
+
+  event.preventDefault();
+  if (input.dataset.edited === 'true') {
+    setCell(row, col, input.value);
+    input.dataset.edited = 'false';
+  }
+
+  const nextTarget = { ...target };
+  const filterState = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter);
+  if (filterState.enabled) {
+    const visibleRows = visibleSheetRowIndexes();
+    if (!visibleRows.includes(nextTarget.row)) {
+      const direction = nextTarget.row > row ? 1 : -1;
+      let candidates = direction > 0
+        ? visibleRows.filter(visibleRow => visibleRow > row)
+        : visibleRows.filter(visibleRow => visibleRow < row).reverse();
+      if (!candidates.length && nextTarget.row === row) {
+        candidates = visibleRows
+          .filter(visibleRow => visibleRow > 0)
+          .sort((left, right) => Math.abs(left - row) - Math.abs(right - row));
+      }
+      if (!candidates.length) {
+        event.preventDefault();
+        keepSelectedSheetCellVisible();
+        renderSheet();
+        setStatus('No more visible rows in that direction');
+        return true;
+      }
+      nextTarget.row = candidates[0];
+    }
+  }
+
+  try {
+    sheetNavigation.ensureCellExists(activeDoc().cells, nextTarget.row, nextTarget.col);
+  } catch (error) {
+    setStatus(error.message);
+    return true;
+  }
+
+  resetSheetSelection(nextTarget.row, nextTarget.col);
+  let next = sheetWrap.querySelector('input.grid-cell[data-row="' + nextTarget.row + '"][data-col="' + nextTarget.col + '"]');
+  if (!next) {
+    renderSheet();
+    next = sheetWrap.querySelector('input.grid-cell[data-row="' + nextTarget.row + '"][data-col="' + nextTarget.col + '"]');
+  }
+  persist();
+  renderToolbar();
+  if (next) {
+    next.focus({ preventScroll: true });
+    next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+  updateSheetFormulaBar();
+  return true;
+}
+
 function renderSheet() {
   const rows = activeDoc().cells || (activeDoc().cells = clone(defaults.sheets.cells));
-  const maxCols = Math.max(12, ...rows.map(r=>r.length));
-  const table = document.createElement('table'); table.className='sheet';
-  const thead = document.createElement('thead'), head = document.createElement('tr'); const corner=document.createElement('th'); corner.textContent=''; head.append(corner);
-  for(let c=0;c<maxCols;c++){const th=document.createElement('th');th.textContent=letter(c);head.append(th);} thead.append(head); table.append(thead);
-  const tbody=document.createElement('tbody');
-  rows.forEach((row,r)=>{const tr=document.createElement('tr'),th=document.createElement('th');th.textContent=String(r+1);tr.append(th);
-    for(let c=0;c<maxCols;c++){const td=document.createElement('td'),input=document.createElement('input');input.className='grid-cell';input.value=String(cellNumeric(r,c));input.dataset.row=r;input.dataset.col=c;input.setAttribute('aria-label',`${letter(c)}${r+1}`);input.lang=state.proofingLanguage;
-      input.addEventListener('focus',()=>{state.selectedCell={row:r,col:c};renderToolbar();});
-      input.addEventListener('change',()=>{setCell(r,c,input.value);refreshSheetValues();});
-      input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();setCell(r,c,input.value);const next=sheetWrap.querySelector(`input[data-row="${r+1}"][data-col="${c}"]`);next?.focus();refreshSheetValues();}});td.append(input);tr.append(td);}
+  const maxCols = rows.reduce((maximum, row) => Math.max(maximum, row.length), 12);
+  const visibleRowIndexes = visibleSheetRowIndexes();
+  const autoFilter = sheetDataTools.normalizeAutoFilterState(activeDoc().autoFilter);
+  const table = document.createElement('table'); table.className = 'sheet';
+  const thead = document.createElement('thead'), head = document.createElement('tr');
+  const corner = document.createElement('th'); corner.textContent = ''; head.append(corner);
+  for (let c = 0; c < maxCols; c += 1) {
+    const th = document.createElement('th'); th.textContent = letter(c); head.append(th);
+  }
+  thead.append(head); table.append(thead);
+  const tbody = document.createElement('tbody');
+  visibleRowIndexes.forEach(rowIndex => {
+    const row = rows[rowIndex];
+    const tr = document.createElement('tr');
+    tr.dataset.row = rowIndex;
+    const rowHeader = document.createElement('th');
+    rowHeader.textContent = String(rowIndex + 1);
+    rowHeader.setAttribute('scope', 'row');
+    tr.append(rowHeader);
+    for (let c = 0; c < maxCols; c += 1) {
+      const td = document.createElement('td');
+      const input = document.createElement('input');
+      input.className = 'grid-cell';
+      input.value = formattedCellValue(rowIndex, c);
+      input.dataset.row = rowIndex;
+      input.dataset.col = c;
+      input.setAttribute('aria-label', letter(c) + (rowIndex + 1));
+      input.lang = state.proofingLanguage;
+      applyCellVisualStyle(input, rowIndex, c);
+      input.addEventListener('mousedown', event => {
+        state.pendingMouseSelection = true;
+        state.extendSelectionOnClick = Boolean(event.shiftKey && state.selectionAnchor);
+        if (!state.extendSelectionOnClick) state.selectionAnchor = { row: rowIndex, col: c };
+      });
+      input.addEventListener('focus', () => {
+        state.selectedCell = { row: rowIndex, col: c };
+        if (!state.pendingMouseSelection) {
+          state.selectionAnchor = { row: rowIndex, col: c };
+          state.selectedRange = sheetRange.rangeFromCells(state.selectionAnchor, state.selectedCell);
+        }
+        input.value = cellRaw(rowIndex, c);
+        applySheetRangeHighlight();
+        renderToolbar();
+        updateSheetFormulaBar();
+      });
+      input.addEventListener('click', () => {
+        const focus = { row: rowIndex, col: c };
+        if (!state.extendSelectionOnClick) state.selectionAnchor = focus;
+        state.selectedCell = focus;
+        state.selectedRange = sheetRange.rangeFromCells(state.selectionAnchor, focus);
+        state.pendingMouseSelection = false;
+        state.extendSelectionOnClick = false;
+        applySheetRangeHighlight();
+        renderToolbar();
+        updateSheetFormulaBar();
+      });
+      input.addEventListener('blur', () => {
+        if (input.dataset.edited !== 'true') input.value = formattedCellValue(rowIndex, c);
+      });
+      input.addEventListener('input', () => { input.dataset.edited = 'true'; });
+      input.addEventListener('change', () => {
+        const changed = input.dataset.edited === 'true';
+        if (changed) setCell(rowIndex, c, input.value);
+        input.dataset.edited = 'false';
+        if (changed) refreshSheetAfterFilterableEdit();
+        else refreshSheetValues();
+      });
+      input.addEventListener('keydown', event => navigateSheetCell(input, event));
+      td.append(input);
+      if (rowIndex === 0 && autoFilter.enabled) {
+        td.classList.add('sheet-filter-cell');
+        input.classList.add('has-filter-button');
+        const filterButton = document.createElement('button');
+        filterButton.type = 'button';
+        filterButton.className = 'sheet-filter-trigger';
+        const activeColumnFilter = Object.prototype.hasOwnProperty.call(autoFilter.filters, String(c));
+        filterButton.classList.toggle('has-filter', activeColumnFilter);
+        filterButton.textContent = '▾';
+        filterButton.title = 'Filter column ' + letter(c);
+        filterButton.dataset.column = String(c);
+        filterButton.setAttribute('aria-label', (activeColumnFilter ? 'Edit active filter for column ' : 'Filter column ') + letter(c));
+        filterButton.setAttribute('aria-expanded', String(state.sheetFilterMenuColumn === c));
+        filterButton.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (state.sheetFilterMenuColumn === c) closeSheetFilterMenu();
+          else openSheetFilterMenu(c);
+        });
+        td.append(filterButton);
+        renderSheetFilterMenu(td, c);
+      }
+      tr.append(td);
+    }
     tbody.append(tr);
-  }); table.append(tbody); sheetWrap.innerHTML=''; sheetWrap.append(table);
+  });
+  table.append(tbody);
+  sheetWrap.innerHTML = '';
+  sheetWrap.append(table);
+  applySheetRangeHighlight();
+  renderSheetTabs();
+  updateSheetFormulaBar();
 }
+
 function renderSlides() {
   const doc=activeDoc(); if(!Array.isArray(doc.slides)||!doc.slides.length)doc.slides=[{title:t('common.newSlide'),body:''}];
   doc.current=Math.min(Math.max(0,doc.current||0),doc.slides.length-1); const slide=doc.slides[doc.current];
@@ -839,6 +1825,9 @@ function render() {
     const isDatabase = state.app === 'database';
     const isWorkspace = state.app === 'loop';
     $('todo-wrap').hidden = !isTodo; $('lists-wrap').hidden = !isLists; $('forms-wrap').hidden = !isForms; $('planner-wrap').hidden = !isPlanner; $('database-wrap').hidden = !isDatabase; $('workspace-app-wrap').hidden = !isWorkspace;
+    $('sheet-formula-bar').hidden = state.app !== 'sheets';
+    $('sheet-tabs').hidden = state.app !== 'sheets';
+    $('sheet-status-bar').hidden = state.app !== 'sheets';
     $('open-button').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('save-project').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('export-button').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace;
     document.querySelector('.document-bar').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('ribbon-tabs').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace; $('toolbar').hidden = isTodo || isLists || isForms || isPlanner || isDatabase || isWorkspace;
     editor.hidden = !['pages'].includes(state.app); sheetWrap.hidden = state.app !== 'sheets'; slideWrap.hidden = state.app !== 'slides'; notesWrap.hidden = !['notes'].includes(state.app);
@@ -846,7 +1835,8 @@ function render() {
     if (state.app === 'pages') applyPageLayout(); else editor.removeAttribute('style');
     $('notes-editor').value = state.app === 'notes' ? (doc.text || '') : '';
     updateDocumentLanguage();
-    if (state.app === 'sheets') renderSheet(); if (state.app === 'slides') renderSlides();
+    if (state.app === 'sheets') { renderSheet(); applySheetZoom(); updateSheetFormulaBar(); }
+    if (state.app === 'slides') renderSlides();
     if (isTodo) renderTodoWorkspace();
     else if (isLists) renderListsWorkspace();
     else if (isForms) window.BrightdeskFormsUI.render();
@@ -881,7 +1871,10 @@ function collectDocxBlocks() {
 function exportPayload(){
   const doc=activeDoc(),title=$('doc-title').value||'Brightdesk file';doc.title=title;
   if(state.app==='pages')return {kind:'pages',title,html:editor.innerHTML,blocks:collectDocxBlocks()};
-  if(state.app==='sheets')return {kind:'sheets',title,rows:doc.cells||[]};
+  if(state.app==='sheets') {
+    workbookModel.syncActiveWorksheet(doc);
+    return { kind: 'sheets', title, rows: doc.cells || [], worksheets: doc.worksheets, activeWorksheetId: doc.activeWorksheetId };
+  }
   if(state.app==='slides')return {kind:'slides',title,slides:doc.slides||[]};
   return {kind:'notes',title,text:$('notes-editor').value||''};
 }
@@ -892,6 +1885,7 @@ function importProject(data){
   if(data?.docs && typeof data.docs === 'object'){
     state.docs={...clone(defaults),...data.docs};
     for (const id of Object.keys(configs)) if (!state.docs[id] || typeof state.docs[id] !== 'object') state.docs[id] = clone(defaults[id]);
+    state.docs.sheets = workbookModel.normalizeWorkbook(state.docs.sheets, defaults.sheets.cells);
     const preferred = configs[state.app] ? state.app : 'pages';
     const target = state.setupComplete && installedApp(preferred) ? preferred : 'pages';
     if (!state.setupComplete || !installedApp(target)) { state.installedApps = [target]; state.setupComplete = true; }
@@ -901,14 +1895,24 @@ function importProject(data){
   const kind=data?.kind;if(!configs[kind])throw new Error('This file could not be imported.');
   if (!installedApp(kind)) { state.installedApps.push(kind); state.setupComplete = true; saveAppSetup(); }
   if(kind==='pages')state.docs.pages={title:data.title||'Imported document',html:data.html?safeHtml(data.html):`<p>${escapeHtml(data.text||'')}</p>`};
-  if(kind==='sheets')state.docs.sheets={title:data.title||'Imported spreadsheet',cells:(data.cells||[]).map(row=>row.map(v=>String(v??'')))};
+  if(kind==='sheets') {
+    const cells = (data.cells || []).map(row => row.map(value => String(value ?? '')));
+    const worksheets = Array.isArray(data.worksheets) ? data.worksheets.map(sheet => ({
+      ...sheet,
+      cells: (sheet.cells || []).map(row => row.map(value => String(value ?? '')))
+    })) : undefined;
+    state.docs.sheets = workbookModel.normalizeWorkbook({
+      title: data.title || 'Imported spreadsheet', cells, worksheets, activeWorksheetId: data.activeWorksheetId
+    }, defaults.sheets.cells);
+    resetSheetSelection();
+  }
   if(kind==='slides')state.docs.slides={title:data.title||'Imported presentation',slides:data.slides||clone(defaults.slides.slides),current:0};
   if(kind==='notes')state.docs.notes={title:data.title||'Imported note',text:data.text||''};
   state.app=kind; state.ribbonTab='home';
 }
 function escapeHtml(value){return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 async function openFile(){try{const data=await window.brightdesk.openFile();if(!data)return;importProject(data);persist();render();setStatus('File opened');}catch(error){alert(`Could not open file: ${error.message}`);}}
-async function saveProject(){try{const result=await window.brightdesk.saveProject({title:$('doc-title').value,docs:state.docs});if(!result?.canceled)setStatus('Project saved');}catch(error){alert(`Could not save project: ${error.message}`);}}
+async function saveProject(){try{persist();const result=await window.brightdesk.saveProject({title:$('doc-title').value,docs:state.docs});if(!result?.canceled)setStatus('Project saved');}catch(error){alert(`Could not save project: ${error.message}`);}}
 function setApp(app){if((launchAppId && app !== launchAppId) || !(configs[app] || genericConfigs[app]) || !installedApp(app))return;state.app=app;state.view='workspace';state.ribbonTab='home';render();persist();}
 
 document.querySelectorAll('.nav[data-app]').forEach(btn=>btn.addEventListener('click',()=>setApp(btn.dataset.app)));
@@ -922,6 +1926,26 @@ $('check-current-document').addEventListener('click',checkCurrentDocumentSpellin
 $('back-to-apps').addEventListener('click',()=>{state.view=state.setupComplete?'workspace':'manager';render();});
 $('finish-app-setup').addEventListener('click',()=>{if(state.setupComplete){state.view='workspace';render();}else completeAppSetup();});
 $('doc-title').addEventListener('change',()=>{activeDoc().title=$('doc-title').value;persist();});
+sheetWrap.addEventListener('copy', writeSelectedCellToClipboard);
+sheetWrap.addEventListener('cut', cutSelectedSheetCell);
+sheetWrap.addEventListener('paste', pasteIntoSelectedSheetCell);
+$('sheet-name-box').addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const moved = jumpToSheetCell(event.currentTarget.value);
+    if (!moved) event.currentTarget.select();
+  }
+});
+$('sheet-name-box').addEventListener('change', event => {
+  if (document.activeElement === event.currentTarget) jumpToSheetCell(event.currentTarget.value);
+});
+$('formula-input').addEventListener('change', event => {
+  setCell(state.selectedCell.row, state.selectedCell.col, event.currentTarget.value);
+  refreshSheetAfterFilterableEdit();
+});
+$('sheet-zoom-out').addEventListener('click', () => changeSheetZoom(-10));
+$('sheet-zoom-in').addEventListener('click', () => changeSheetZoom(10));
+$('sheet-zoom-reset').addEventListener('click', () => { state.sheetZoom = 100; applySheetZoom(); updateSheetFormulaBar(); });
 editor.addEventListener('input',()=>{activeDoc().html=editor.innerHTML;persist();});
 $('notes-editor').addEventListener('input',()=>{activeDoc().text=$('notes-editor').value;persist();});
 $('todo-create-form').addEventListener('submit', createTodoTask);
