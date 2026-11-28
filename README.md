@@ -141,3 +141,8 @@ The Electron main process validates the configured product ID against the shared
 ## Test discovery
 
 `npm test` uses Node.js 24's built-in automatic test discovery (`node --test`). It runs discovered test files under `tests/`, including newly added regression tests, without maintaining a manually curated file list. Platform-specific installer acceptance must still be run on the relevant native operating system; a macOS test run does not verify Windows or Linux installer behaviour.
+
+
+## Repository automation
+
+The repository bootstrap templates use pinned GitHub Actions checkout v7.0.1 and setup-node v7.1.0 actions. README freshness checks run on GitHub-hosted Ubuntu.
