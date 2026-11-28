@@ -1,6 +1,6 @@
 # Brightdesk Sheets
 
-<p align="center"><img src="assets/brand/brightdesk-logo.svg" alt="Brightdesk Office Suite" width="420"></p>
+<p align="center"><img src="assets/brand/brightdesk-logo.svg" alt="Brightdesk logo" width="420"></p>
 <p align="center"><img src="assets/icons/sheets.svg" alt="Brightdesk Sheets application icon" width="112" height="112"></p>
 
 <p align="center"><strong>Work with tables, calculations, formulas and data.</strong></p>
