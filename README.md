@@ -13,6 +13,8 @@
 
 Brightdesk Sheets is a dedicated desktop application within the independent Brightdesk Office Suite. It uses the shared Brightdesk design language and opens directly into Sheets.
 
+Development and CI use the exact Node.js 24.22.3 LTS runtime.
+
 ## Shared Brightdesk design standard
 
 This product follows the [Brightdesk visual and interaction standard](https://github.com/connormolloy12/Brightdesk-suite/blob/main/docs/BRIGHTDESK_VISUAL_STANDARD.md) for branding, icon usage, layout, responsive behaviour and accessibility.
@@ -73,7 +75,7 @@ Installer builds are started manually. Publishing a GitHub Release is a separate
 
 ## Run from source
 
-Use Node.js **24.22.2**.
+Use Node.js **24.22.3**.
 
 The desktop shell uses Electron **45.2.1**. Run `npm ci` to install the exact dependency versions recorded in the lockfile.
 
