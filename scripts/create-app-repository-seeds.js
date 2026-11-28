@@ -177,7 +177,7 @@ function repositoryReadme(product) {
     '| macOS | Universal installer (.dmg), package (.pkg) and archive (.zip) |',
     '| Linux | x64 AppImage and Debian package (.deb) |',
     '',
-    'The complete ten-product desktop suite remains available from [Brightdesk-suite](https://github.com/connormolloy12/Brightdesk-suite).',
+    'The complete ten-product desktop suite remains available from [Brightdesk-suite](https://github.com/conz20/Brightdesk-suite).',
     '',
     '## Quality and security',
     '',
@@ -208,7 +208,7 @@ function repositoryReadme(product) {
     '',
     '## Related project',
     '',
-    '[Brightdesk Office Suite](https://github.com/connormolloy12/Brightdesk-suite) brings all ten approved Brightdesk products together in one desktop installer.',
+    '[Brightdesk Office Suite](https://github.com/conz20/Brightdesk-suite) brings all ten approved Brightdesk products together in one desktop installer.',
     '',
     '## Identity and licence',
     '',
@@ -421,7 +421,7 @@ function createProductRepositorySeeds({ rootDir = path.resolve(__dirname, '..'),
 - Product ID: \`${product.appId}\`
 - Repository visibility: choose when creating the GitHub repository
 - Description: ${product.description}
-- Main suite: https://github.com/connormolloy12/Brightdesk-suite
+- Main suite: https://github.com/conz20/Brightdesk-suite
 
 This product folder is ready to upload to a GitHub repository named \`${product.repository}\`. It is the dedicated desktop edition of ${product.name}. The shared suite keeps the complete ten-product experience.
 `);
